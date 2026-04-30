@@ -134,9 +134,10 @@ def call_llm_with_retry(
     """
     带重试 + 自动回退的 LLM 调用
 
-    调用策略:
-      1. 主通道 (DeepSeek 官方) 重试 max_retries 次
-      2. 若主通道全部失败且配置了备用 Key，切换到备用通道 (OpenRouter) 再重试一轮
+    调用策略 (优先级从高到低):
+      1. 主通道: DeepSeek 官方 (支持 Thinking 模式)
+      2. 二级备用: Google GenAI
+      3. 三级兜底: OpenRouter
 
     Args:
         prompt: 用户提示词
@@ -164,7 +165,7 @@ def call_llm_with_retry(
             headers["X-Title"] = "DeepSeek CMS Agent"
         return headers
 
-    def _try_channel(api_key: str, api_url: str, api_model: str, channel_name: str) -> Optional[str]:
+    def _try_channel(api_key: str, api_url: str, api_model: str, channel_name: str, enable_thinking: bool = False) -> Optional[str]:
         """尝试在单个通道上完成请求，成功返回内容，失败返回 None"""
         headers = _build_headers(api_key, api_url)
         payload = {
@@ -174,22 +175,42 @@ def call_llm_with_retry(
             "max_tokens": 8192
         }
 
+        # DeepSeek Thinking 模式注入
+        if enable_thinking and getattr(config, 'DEEPSEEK_THINKING_ENABLED', False):
+            reasoning_effort = getattr(config, 'DEEPSEEK_REASONING_EFFORT', 'high')
+            payload["thinking"] = {"type": "enabled"}
+            payload["reasoning_effort"] = reasoning_effort
+            # Thinking 模式下需要更大的 max_tokens (包含思维链输出)
+            payload["max_tokens"] = 16384
+            # Thinking 模式下 temperature 参数不生效，但不会报错
+            print(f"   🧠 [Thinking] 已开启思考模式 (effort={reasoning_effort})")
+
+        # Thinking 模式需要更长超时 (思维链输出耗时较长)
+        request_timeout = 180 if enable_thinking else 90
+
         for attempt in range(max_retries + 1):
             try:
-                resp = requests.post(api_url, headers=headers, json=payload, timeout=90)
+                resp = requests.post(api_url, headers=headers, json=payload, timeout=request_timeout)
 
                 if resp.status_code == 200:
                     data = resp.json()
                     if 'choices' in data:
+                        msg = data['choices'][0]['message']
+                        # 提取 reasoning_content (思维链，仅日志打印用)
+                        reasoning = msg.get('reasoning_content', '')
+                        if reasoning:
+                            # 截取前 200 字作为日志预览
+                            preview = reasoning[:200] + '...' if len(reasoning) > 200 else reasoning
+                            print(f"   💭 [Thinking] 思维链预览: {preview}")
                         print(f"   ✨ [{channel_name}] 调用成功")
-                        return data['choices'][0]['message']['content']
+                        return msg.get('content', '')
                     else:
                         print(f"   ⚠️ [{channel_name}] 响应格式异常: {data}")
                 else:
                     print(f"   ⚠️ [{channel_name}] 错误 [{resp.status_code}]: {resp.text[:200]}")
 
             except requests.exceptions.Timeout:
-                print(f"   ⚠️ [{channel_name}] 请求超时 (尝试 {attempt + 1}/{max_retries + 1})")
+                print(f"   ⚠️ [{channel_name}] 请求超时 (尝试 {attempt + 1}/{max_retries + 1}, timeout={request_timeout}s)")
 
             except Exception as e:
                 print(f"   ❌ [{channel_name}] 请求异常: {e}")
@@ -199,10 +220,18 @@ def call_llm_with_retry(
 
         return None  # 该通道所有重试均失败
 
-    # ── 前置首选通道: Google GenAI 模型 ──
+    # ── 🥇 主通道: DeepSeek 官方 (最高优先级, 支持 Thinking) ──
+    primary_model = model or config.LLM_MODEL
+    is_deepseek_model = not model or "deepseek" in (model or "").lower() or model == config.LLM_MODEL
+    print(f"   🚀 尝试使用 DeepSeek 主通道 ({primary_model})...")
+    result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, primary_model, "DeepSeek官方", enable_thinking=is_deepseek_model)
+    if result:
+        return result
+
+    # ── 🥈 二级备用通道: Google GenAI ──
     if hasattr(config, 'GOOGLE_GENAI_API_KEY') and config.GOOGLE_GENAI_API_KEY:
         use_google_model = model if model and ("gemma" in model.lower() or "gemini" in model.lower()) else getattr(config, 'GOOGLE_GENAI_MODEL', 'gemini-3.1-flash-lite-preview')
-        print(f"   🚀 尝试使用 Google GenAI 前置通道 ({use_google_model})...")
+        print(f"   🔄 DeepSeek 主通道失败，切换到 Google GenAI 备用通道 ({use_google_model})...")
         try:
             from google import genai
             from google.genai import types
@@ -237,20 +266,12 @@ def call_llm_with_retry(
             print("   ⚠️ [Google GenAI] 未检测到 google-genai 库，请先执行 `pip install google-genai`。")
         except Exception as e:
             print(f"   ⚠️ [Google GenAI] 客户端初始化异常: {e}")
-            
-        print("   ⚠️ 前置通道失败，即将降级到原有主通道策略...")
 
-    # ── 主通道: DeepSeek 官方 ──
-    primary_model = model or config.LLM_MODEL
-    result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, primary_model, "DeepSeek官方")
-    if result:
-        return result
-
-    # ── 备用通道: OpenRouter 兜底 ──
+    # ── 🥉 三级兜底通道: OpenRouter ──
     if config.FALLBACK_API_KEY:
-        print("   🔄 主通道失败，切换到 OpenRouter 备用通道...")
+        print("   🔄 所有主通道失败，切换到 OpenRouter 兜底通道...")
         fallback_model = config.FALLBACK_MODEL
-        result = _try_channel(config.FALLBACK_API_KEY, config.FALLBACK_API_URL, fallback_model, "OpenRouter备用")
+        result = _try_channel(config.FALLBACK_API_KEY, config.FALLBACK_API_URL, fallback_model, "OpenRouter兜底")
         if result:
             return result
 

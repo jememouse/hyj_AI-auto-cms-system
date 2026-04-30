@@ -10,24 +10,28 @@ load_dotenv()
 # 项目根目录
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# LLM API 配置 (DeepSeek 官方优先，OpenRouter 兜底)
+# LLM API 配置 (DeepSeek V4 最高优先级 → Google GenAI 备用 → OpenRouter 兜底)
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 
-# 前置首选通道: Google GenAI 模型 (所有生成流程优先使用)
-GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY", "").strip()
-GOOGLE_GENAI_MODEL = "gemini-3.1-flash-lite-preview"
-
-# 主通道: DeepSeek 官方直连
+# 主通道 (最高优先级): DeepSeek 官方直连 + Thinking 模式
 LLM_API_KEY = DEEPSEEK_API_KEY
 LLM_API_URL = "https://api.deepseek.com/v1/chat/completions"
 LLM_MODEL = "deepseek-v4-flash"
 
-# 业务解耦模型设置 (可被环境变量覆写)
-TITLE_MODEL = os.getenv("TITLE_MODEL", LLM_MODEL)          # 标题通常需要速度，复用基础大发即可
-ARTICLE_MODEL = os.getenv("ARTICLE_MODEL", LLM_MODEL)      # 长文通常需要逻辑能力，推荐覆写为 deepseek-reasoner 或同级专有模型
+# DeepSeek Thinking 模式配置
+DEEPSEEK_THINKING_ENABLED = True   # 开启思考模式 (思维链推理)
+DEEPSEEK_REASONING_EFFORT = "high" # 思考强度: "high" (默认) 或 "max" (复杂任务)
 
-# 备用通道: OpenRouter (当主通道重试耗尽后自动切换)
+# 业务解耦模型设置 (可被环境变量覆写)
+TITLE_MODEL = os.getenv("TITLE_MODEL", LLM_MODEL)          # 标题生成
+ARTICLE_MODEL = os.getenv("ARTICLE_MODEL", LLM_MODEL)      # 长文写作
+
+# 二级备用通道: Google GenAI (当主通道失败后切换)
+GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY", "").strip()
+GOOGLE_GENAI_MODEL = "gemini-3.1-flash-lite-preview"
+
+# 三级兜底通道: OpenRouter (所有通道失败后最终兜底)
 FALLBACK_API_KEY = OPENROUTER_API_KEY
 FALLBACK_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 FALLBACK_MODEL = "deepseek/deepseek-v4-flash"
