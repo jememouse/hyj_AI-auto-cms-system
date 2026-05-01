@@ -386,9 +386,18 @@ def run(config_file: str = None):
     
     # 发送飞书通知
     if total_success > 0 or total_fail > 0:
-        notify_content = f"**发布结果**\n- ✅ 成功: {total_success} 篇\n- ❌ 失败: {total_fail} 篇\n- ⏰ 时间: {time.strftime('%Y-%m-%d %H:%M')}\n\n{stats.get_summary()}"
+        category_label = f"[{target_category}]" if target_category else "[全分类]"
+        notify_title = f"📤 发布完成 {category_label} ✅{total_success} ❌{total_fail}"
+        notify_content = (
+            f"**发布结果 {category_label}**\n"
+            f"- ✅ 成功: {total_success} 篇\n"
+            f"- ❌ 失败: {total_fail} 篇\n"
+            f"- 👤 使用账号: {len(accounts)} 个\n"
+            f"- ⏰ 时间: {time.strftime('%Y-%m-%d %H:%M')}\n"
+            f"\n{stats.get_summary()}"
+        )
         client.send_notification(
-            title="📤 CMS 发布任务完成",
+            title=notify_title,
             content=notify_content
         )
 
