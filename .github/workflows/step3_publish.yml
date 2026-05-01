@@ -12,7 +12,7 @@ env:
 jobs:
   step3-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 25          # 25分钟超时 (单分类10篇/次，每篇约1分钟)
+    timeout-minutes: 35          # 35分钟超时 (单分类20篇/次，每篇约1分钟)
     strategy:
       matrix:
         category: ["专业知识", "行业资讯", "产品介绍"]
@@ -38,10 +38,10 @@ jobs:
 
     - name: Run Step3 - RPA 发布 (${{ matrix.category }})
       env:
-        # 并行模式: 每个 Job 独占一个分类
+        # 并行模式: 每个 Job 独占一个分类，每次发布 20 篇
         PUBLISH_CATEGORY: ${{ matrix.category }}
-        MAX_PUBLISH_TOTAL: "10"
-        MAX_PUBLISH_PER_CATEGORY: "10"
+        MAX_PUBLISH_TOTAL: "20"
+        MAX_PUBLISH_PER_CATEGORY: "20"
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
