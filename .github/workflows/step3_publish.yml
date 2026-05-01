@@ -12,7 +12,7 @@ env:
 jobs:
   step3-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 30          # 30分钟超时 (20篇/次，每篇约1分钟)
+    timeout-minutes: 45          # 45分钟超时 (30篇/次，每篇约1分钟)
     concurrency:
       group: step3-publish
       cancel-in-progress: false  # 跳过新任务，不取消正在运行的
@@ -34,7 +34,7 @@ jobs:
 
     - name: Run Step3 - RPA 发布
       env:
-        # 单类每次发送 10 篇（每小时发 30 篇）
+        # 单类每次发送 10 篇（每次发 30 篇）
         MAX_PUBLISH_PER_CATEGORY: "10"
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}

@@ -311,7 +311,7 @@
             }
         }
     ],
-    "max_publish_total": 20,
+    "max_publish_total": 30,
     "default_interval_minutes": 1,
     "schema_config": {
         "inject_faq_schema": true,
