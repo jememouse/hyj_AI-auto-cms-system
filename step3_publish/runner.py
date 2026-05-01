@@ -99,7 +99,12 @@ def run(config_file: str = None):
     
     accounts = publish_config.get("accounts", [])
     default_interval = publish_config.get("default_interval_minutes", 1)
-    max_publish_total = publish_config.get("max_publish_total", 20)  # 单次发布上限
+    max_publish_total = int(os.getenv("MAX_PUBLISH_TOTAL", str(publish_config.get("max_publish_total", 20))))  # 环境变量可覆盖
+    
+    # 并行分类过滤: 指定 PUBLISH_CATEGORY 时只处理该分类 (配合 GitHub Actions matrix)
+    target_category = os.getenv("PUBLISH_CATEGORY", "").strip()
+    if target_category:
+        print(f"🎯 并行模式: 仅处理分类 [{target_category}]")
     
     # 获取 Schema 配置 (默认: FAQ开启, Article关闭以避免冲突)
     schema_config = publish_config.get("schema_config", {})
@@ -152,6 +157,8 @@ def run(config_file: str = None):
         try:
             # 遍历该账号负责的分类
             for category, limit in categories.items():
+                if target_category and category != target_category:
+                    continue
                 if limit <= 0:
                     continue
                 
