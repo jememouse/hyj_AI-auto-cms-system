@@ -2,8 +2,8 @@ name: Step3 - RPA 发布到 WellCMS
 
 on:
   schedule:
-    # 北京时间 全天 24 小时每 1 小时执行
-    - cron: '0 * * * *'
+    # 北京时间 全天 24 小时每 30 分钟执行
+    - cron: '0,30 * * * *'
   workflow_dispatch:  # 允许手动触发
 
 env:
@@ -12,7 +12,7 @@ env:
 jobs:
   step3-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 25          # 25分钟超时（留5分钟buffer）
+    timeout-minutes: 30          # 30分钟超时 (20篇/次，每篇约1分钟)
     concurrency:
       group: step3-publish
       cancel-in-progress: false  # 跳过新任务，不取消正在运行的

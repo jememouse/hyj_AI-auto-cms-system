@@ -311,10 +311,11 @@
             }
         }
     ],
+    "max_publish_total": 20,
     "default_interval_minutes": 1,
     "schema_config": {
         "inject_faq_schema": true,
         "inject_article_schema": false
     },
-    "comment": "interval_minutes: 每篇文章发布后的等待时间（分钟）; schema_config: 控制是否注入结构化数据 (解决 GSC 重复字段问题)"
+    "comment": "max_publish_total: 单次运行最大发布篇数; interval_minutes: 每篇文章发布后的等待时间(分钟); schema_config: 控制是否注入结构化数据"
 }

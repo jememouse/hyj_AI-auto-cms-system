@@ -99,6 +99,7 @@ def run(config_file: str = None):
     
     accounts = publish_config.get("accounts", [])
     default_interval = publish_config.get("default_interval_minutes", 1)
+    max_publish_total = publish_config.get("max_publish_total", 20)  # 单次发布上限
     
     # 获取 Schema 配置 (默认: FAQ开启, Article关闭以避免冲突)
     schema_config = publish_config.get("schema_config", {})
@@ -111,7 +112,12 @@ def run(config_file: str = None):
         print("⚠️ 没有配置任何账号")
         return
     
-    print(f"📋 共 {len(accounts)} 个账号\n")
+    print(f"📋 共 {len(accounts)} 个账号 | 本次发布上限: {max_publish_total} 篇")
+    
+    # 随机打乱账号顺序: 确保所有账号均匀轮换，避免永远只用前几个
+    import random
+    random.shuffle(accounts)
+    print(f"🔀 账号已随机排序: {', '.join(a.get('username','?') for a in accounts[:5])}{'...' if len(accounts) > 5 else ''}\n")
     
     client = GoogleSheetClient()
     
@@ -133,31 +139,51 @@ def run(config_file: str = None):
         # 创建该账号的发布器
         publisher = WellCMSPublisher(username=username, password=password)
         
-        # 遍历该账号负责的分类
-        for category, limit in categories.items():
-            if limit <= 0:
-                continue
-            
-            print(f"\n📂 分类: {category} (发布 {limit} 篇)")
-            
-            # 获取该分类的 Pending 记录，优先获取最新(按生成时间倒序)记录
-            records = client.fetch_records_by_status(
-                status=config.STATUS_PENDING,
-                category=category,
-                limit=limit,
-                sort_by_time_col="生成时间",
-                reverse_batch=True
-            )
-            
-            if not records:
-                print(f"   ⚠️ 没有待发布的文章")
-                continue
-            
-            # 发布每篇文章
-            for idx, record in enumerate(records):
-                title = record.get("title") or record.get("topic", "")
+        # === 会话复用: 同一账号只启动一次浏览器、登录一次 ===
+        print(f"   🔑 正在登录 {username}...")
+        session_ok = publisher.open_session()
+        if not session_ok:
+            print(f"   ❌ 账号 {username} 登录失败，跳过该账号所有任务")
+            total_fail += sum(v for v in categories.values() if v > 0)
+            continue
+        
+        print(f"   ✅ 会话已建立，开始批量发布")
+        
+        try:
+            # 遍历该账号负责的分类
+            for category, limit in categories.items():
+                if limit <= 0:
+                    continue
                 
-                print(f"\n   [{idx + 1}/{len(records)}] {title[:30]}...")
+                print(f"\n📂 分类: {category} (发布 {limit} 篇)")
+                
+                # 获取该分类的 Pending 记录，优先获取最新(按生成时间倒序)记录
+                records = client.fetch_records_by_status(
+                    status=config.STATUS_PENDING,
+                    category=category,
+                    limit=limit,
+                    sort_by_time_col="生成时间",
+                    reverse_batch=True
+                )
+                
+                if not records:
+                    print(f"   ⚠️ 没有待发布的文章")
+                    continue
+                
+                # 全局上限检查: 裁剪当前批次
+                remaining = max_publish_total - (total_success + total_fail)
+                if remaining <= 0:
+                    print(f"   🛑 已达本次发布上限 ({max_publish_total} 篇)，跳过剩余任务")
+                    break
+                if len(records) > remaining:
+                    print(f"   ✂️ 裁剪当前批次: {len(records)} -> {remaining} (全局上限 {max_publish_total})")
+                    records = records[:remaining]
+
+                # 发布每篇文章
+                for idx, record in enumerate(records):
+                    title = record.get("title") or record.get("topic", "")
+                    
+                    print(f"\n   [{idx + 1}/{len(records)}] {title[:30]}...")
                 
                 # 准备文章数据
                 html_content = record.get("html_content", "")
@@ -288,9 +314,9 @@ def run(config_file: str = None):
                     "tags": record.get("tags", ""),
                 }
                 
-                # RPA 发布
+                # RPA 发布 (复用已建立的会话，无需重新登录)
                 print("      📤 正在发布...")
-                success, url_link = publisher.publish_sync(article)
+                success, url_link = publisher.publish_in_session(article)
                 
                 if not success:
                     print("      ⚠️ 发布失败")
@@ -323,8 +349,17 @@ def run(config_file: str = None):
                     wait_sec = random.uniform(10, 20)
                     print(f"      ⏳ 等待 {wait_sec:.1f} 秒...")
                     time.sleep(wait_sec)
+        finally:
+            # 确保浏览器会话一定被关闭 (即使发布中途异常)
+            publisher.close_session()
+            print(f"   🔒 账号 {username} 会话已关闭")
         
-        # 账号轮换等待
+        # 全局上限检查 (跨账号)
+        if (total_success + total_fail) >= max_publish_total:
+            print(f"\n   🛑 已达全局发布上限 ({max_publish_total} 篇)，停止后续账号")
+            break
+
+        # 账号轮换等待 (减少间隔: 会话复用后每个账号已节省大量时间)
         if acc_idx < len(accounts) - 1:
             print(f"\n   ⏳ 账号 [{username}] 任务完成，休息 {interval_min} 分钟 ({interval_sec}秒)...")
             time.sleep(interval_sec)

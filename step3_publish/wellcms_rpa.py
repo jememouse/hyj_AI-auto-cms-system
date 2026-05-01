@@ -896,3 +896,38 @@ class WellCMSPublisher:
     def publish_sync(self, article: Dict) -> Tuple[bool, str]:
         """兼容旧接口"""
         return self.publish(article)
+
+    # ================================================================
+    # 会话复用接口: 同一账号多篇文章共享浏览器，减少登录开销
+    # ================================================================
+    def open_session(self) -> bool:
+        """
+        打开浏览器并登录，建立可复用的会话。
+        成功返回 True，失败返回 False。
+        调用方需在结束后调用 close_session()。
+        """
+        try:
+            self._init_browser()
+            if not self._login():
+                self._close_browser()
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"[Session] 打开会话失败: {e}")
+            self._close_browser()
+            return False
+
+    def publish_in_session(self, article: Dict) -> Tuple[bool, str]:
+        """
+        在已打开的会话中发布单篇文章（不重新登录）。
+        必须先调用 open_session() 且返回 True。
+        """
+        try:
+            return self._publish_article(article)
+        except Exception as e:
+            logger.error(f"[Session] 会话内发布失败: {e}")
+            return False, ""
+
+    def close_session(self):
+        """关闭浏览器会话"""
+        self._close_browser()
