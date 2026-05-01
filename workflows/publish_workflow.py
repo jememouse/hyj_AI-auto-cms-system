@@ -71,7 +71,7 @@ class PublishWorkflow(BaseWorkflow):
         print(f"🤖 启动 Workflow: {self.name}")
         print(f"{'=' * 50}\n")
 
-        limit = 30
+        limit = 20
         num_accounts = len(self.active_accounts) if self.active_accounts else 1
         print(f"⚙️  账号数: {num_accounts} | 本次锁定发布: {limit} 篇")
 
