@@ -213,13 +213,17 @@ class PublishWorkflow(BaseWorkflow):
         if total_success > 0 or total_fail > 0:
             elapsed = int(time.time() - start_ts)
             elapsed_str = f"{elapsed // 60}分{elapsed % 60}秒"
+            used_accounts = len(account_groups)
+            avg_time = round(elapsed / (total_success + total_fail), 1) if (total_success + total_fail) > 0 else 0
+            
             self.bus.send_notification(
-                title="📤 CMS 发布任务完成",
+                title="📤 CMS 发布任务完成 (🚀 极速版)",
                 content=(
                     f"**发布结果**\n"
                     f"- ✅ 成功: {total_success} 篇\n"
                     f"- ❌ 失败: {total_fail} 篇\n"
-                    f"- ⏱️ 耗时: {elapsed_str}\n"
+                    f"- 👥 动用账号: {used_accounts} 个 (已开启 Session 复用)\n"
+                    f"- ⏱️ 总耗时: {elapsed_str} (单篇均时 {avg_time}s)\n"
                     f"- ⏰ 时间: {time.strftime('%Y-%m-%d %H:%M')}\n\n"
                     f"{stats.get_summary()}"
                 )
