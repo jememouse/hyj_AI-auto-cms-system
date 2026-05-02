@@ -82,19 +82,19 @@ class StateBus:
             except Exception as e:
                 print(f"[StateBus] ❌ 网络层总线路由异常 (Google Sheet 同步失败): {e}")
 
-    def pull_ready_jobs(self, max_total_limit: int):
+    def pull_ready_jobs(self, max_total_limit: int, category: str = None):
         """
         [节点 2 拉取] 从状态总线获取准备好的写入任务
         包含基于公平优先级的分配组装（Priority 插队及普通请求 Round-Robin）。
         
         返回: 执行清单列表 List[dict]
         """
-        print("[StateBus] ☁️ 正在向公共状态总线核对库存任务清单...")
+        print(f"[StateBus] ☁️ 正在向公共状态总线核对库存任务清单... (分类过滤: {category or '无'})")
         
         # 拉取高级指令槽
-        priority_topics = self.client.fetch_records_by_status(config.STATUS_PRIORITY, limit=100, sort_by_time_col="选题生成时间", reverse_batch=False)
+        priority_topics = self.client.fetch_records_by_status(config.STATUS_PRIORITY, category=category, limit=100, sort_by_time_col="选题生成时间", reverse_batch=False)
         # 拉取普通指令槽
-        ready_topics = self.client.fetch_records_by_status(config.STATUS_READY, limit=500, sort_by_time_col="选题生成时间", reverse_batch=False)
+        ready_topics = self.client.fetch_records_by_status(config.STATUS_READY, category=category, limit=500, sort_by_time_col="选题生成时间", reverse_batch=False)
         
         if not (priority_topics + ready_topics):
              print("[StateBus] ❌ 状态池空荡无存。未检视到处于 Priority/Ready 标记的任务指令。流程休眠。")

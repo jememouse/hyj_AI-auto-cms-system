@@ -12,8 +12,13 @@ env:
 jobs:
   step2-article:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        category: ["专业知识", "行业资讯", "产品介绍"]
+      fail-fast: false
     concurrency:
-      group: step2-article
+      group: step2-article-${{ matrix.category }}
       cancel-in-progress: false
     
     steps:
@@ -28,8 +33,9 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
-    - name: Run Step2 - AI 文章生成 (按时间顺序处理所有文章)
+    - name: Run Step2 - AI 文章生成 (${{ matrix.category }})
       env:
+        ARTICLE_CATEGORY: ${{ matrix.category }}
         # 使用国内 DeepSeek 直连 API
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}

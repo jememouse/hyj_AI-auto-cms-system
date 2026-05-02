@@ -29,7 +29,8 @@ class ArticleWorkflow(BaseWorkflow):
 
     def fetch_jobs(self) -> list:
         limit = config.STEP2_STRATEGY.get("max_generate_total", 120)
-        return self.bus.pull_ready_jobs(limit)
+        category_filter = os.getenv("ARTICLE_CATEGORY")
+        return self.bus.pull_ready_jobs(limit, category=category_filter)
 
     def process_job(self, job: dict):
         source_trend = job.get('Source_Trend', '')
