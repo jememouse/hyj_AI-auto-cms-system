@@ -149,15 +149,16 @@ class StateBus:
              print(f"[StateBus] 💾 远程状态节点握手完成 (ID: {job_record_id} 并已推向 {fields.get('Status')} 轨道)")
         return success
 
-    def pull_pending_publish_jobs(self, limit: int):
+    def pull_pending_publish_jobs(self, limit: int, category: str = None):
         """
         [节点 3 拉取] 从云端总线拉取处于撰写完毕待投发状态的任务。
         依照 Priority 队列插入最前的原则。
         """
-        print("[StateBus] ☁️ 正在向公共状态总线核接待发布(Pending)文章...")
+        print(f"[StateBus] ☁️ 正在向公共状态总线核接待发布(Pending)文章... (分类过滤: {category or '无'})")
         # 1. 优先拉取最高优先级队列 (Top_priority_pending 或等价状态)
         priority_records = self.client.fetch_records_by_status(
             status=config.STATUS_TOP_PRIORITY_PENDING, 
+            category=category,
             limit=limit,
             sort_by_time_col="生成时间",
             reverse_batch=True
@@ -168,6 +169,7 @@ class StateBus:
         if remaining_limit > 0:
             standard_records = self.client.fetch_records_by_status(
                 status=config.STATUS_PENDING, 
+                category=category,
                 limit=remaining_limit,
                 sort_by_time_col="生成时间",
                 reverse_batch=True

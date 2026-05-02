@@ -72,10 +72,12 @@ class PublishWorkflow(BaseWorkflow):
         print(f"{'=' * 50}\n")
 
         limit = 20
+        # 从环境变量获取当前并发执行的分类（由 Github Actions step3_publish.yml 传入）
+        category_filter = os.getenv("PUBLISH_CATEGORY")
         num_accounts = len(self.active_accounts) if self.active_accounts else 1
-        print(f"⚙️  账号数: {num_accounts} | 本次锁定发布: {limit} 篇")
+        print(f"⚙️  账号数: {num_accounts} | 本次锁定发布: {limit} 篇 | 分类限制: {category_filter or '无'}")
 
-        pending_records = self.bus.pull_pending_publish_jobs(limit)
+        pending_records = self.bus.pull_pending_publish_jobs(limit, category=category_filter)
 
         total_success = 0
         total_fail = 0
