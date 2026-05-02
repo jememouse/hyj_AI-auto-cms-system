@@ -35,7 +35,8 @@ jobs:
 
     - name: Install Playwright browsers
       run: |
-        # 替换有问题的 Azure 镜像源为 Ubuntu 官方源，避免 DNS 解析失败卡死
+        # 删除强制的镜像列表，并替换有问题的 Azure 镜像源为 Ubuntu 官方源
+        sudo rm -f /etc/apt/apt-mirrors.txt || true
         sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
         sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list 2>/dev/null || true
         sudo timeout 60s apt-get update || true
