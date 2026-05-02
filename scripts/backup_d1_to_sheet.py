@@ -59,6 +59,20 @@ def backup():
             "生成时间": r.get("created_at", "")
         })
         
+        
+    # 执行批量推送前，检查行数是否需要滚动
+    try:
+        sheet = sheet_client._get_sheet("cms_backup")
+        if sheet:
+            filled_rows = len(sheet.col_values(1))
+            if filled_rows >= 10000:
+                new_title = f"cms_backup_{datetime.now().strftime('%Y%m%d_%H%M')}"
+                sheet.update_title(new_title)
+                print(f"🔄 检测到备份表已满 10000 行，已自动将原标签页重命名归档为: {new_title}")
+                # 原表被改名后，接下来的 batch_create_records 会自动帮你建一个全新的 cms_backup 标签页
+    except Exception as e:
+        print(f"⚠️ 检查表格行数时发生异常: {e}")
+
     # 执行批量推送
     success = sheet_client.batch_create_records(upload_list, table_id="cms_backup")
     
