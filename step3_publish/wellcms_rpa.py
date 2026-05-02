@@ -83,6 +83,43 @@ class WellCMSPublisher:
         self.is_logged_in = False
         logger.info("🔌 [HTTP Engine] 会话已关闭")
         
+    def _get_fallback_image(self, keywords: str) -> Tuple[Optional[bytes], str]:
+        """无额度/失败时，调用开源图库作为兜底"""
+        search_query = "packaging box"
+        if keywords:
+            search_query = keywords.split(",")[0].strip()
+            
+        # 1. Pexels
+        if getattr(config, 'PEXELS_API_KEY', None):
+            try:
+                headers = {"Authorization": config.PEXELS_API_KEY}
+                resp = requests.get(f"https://api.pexels.com/v1/search?query={search_query}&per_page=1&size=large", headers=headers, timeout=10)
+                if resp.status_code == 200:
+                    photos = resp.json().get("photos", [])
+                    if photos:
+                        img_url = photos[0].get("src", {}).get("large", "")
+                        img_resp = requests.get(img_url, headers={"User-Agent": self.session.headers["User-Agent"]}, timeout=15)
+                        if img_resp.status_code == 200 and len(img_resp.content) > 10240:
+                            return img_resp.content, img_url
+            except Exception as e:
+                logger.warning(f"Pexels 获取异常: {e}")
+
+        # 2. Pixabay
+        if getattr(config, 'PIXABAY_API_KEY', None):
+            try:
+                resp = requests.get(f"https://pixabay.com/api/?key={config.PIXABAY_API_KEY}&q={search_query}&image_type=photo&per_page=3", timeout=10)
+                if resp.status_code == 200:
+                    hits = resp.json().get("hits", [])
+                    if hits:
+                        img_url = hits[0].get("largeImageURL", "")
+                        img_resp = requests.get(img_url, headers={"User-Agent": self.session.headers["User-Agent"]}, timeout=15)
+                        if img_resp.status_code == 200 and len(img_resp.content) > 10240:
+                            return img_resp.content, img_url
+            except Exception as e:
+                logger.warning(f"Pixabay 获取异常: {e}")
+
+        return None, ""
+
     def _publish_article(self, article: Dict) -> Tuple[bool, str]:
         """纯 HTTP 原生极速发文流程"""
         if not self.is_logged_in:
@@ -103,19 +140,49 @@ class WellCMSPublisher:
         html_content = article.get('html_content', '')
         html_content = "".join(c for c in html_content if ord(c) <= 65535)
         
-        # 2. 尝试提取图片 (沿用之前的辅助方法，这里为了代码整洁直接使用正则表达式提取正文图片，或者通过 fallback 获取)
+        # 2. 图片处理与容错兜底 (Pollinations -> Pexels -> Pixabay)
         image_content = None
         img_match = re.search(r'<img[^>]+src="([^">]+)"', html_content)
+        original_img_url = ""
+        valid_img_url = ""
+        
         if img_match:
-            img_url = img_match.group(1).replace('&amp;', '&')
-            if "pollinations" not in img_url.lower():
-                try:
-                    logger.info(f"📥 正在下载正文图片作为封面: {img_url[:60]}...")
-                    resp = requests.get(img_url, headers={"User-Agent": self.session.headers["User-Agent"]}, timeout=15)
-                    if resp.status_code == 200 and len(resp.content) > 10240:
-                        image_content = resp.content
-                except Exception as e:
-                    logger.warning(f"下载正文图片失败: {e}")
+            original_img_url = img_match.group(1).replace('&amp;', '&')
+            try:
+                # 给予 AI 图片较长超时
+                timeout = 30 if "pollinations" in original_img_url.lower() else 15
+                logger.info(f"📥 正在下载正文图片 (可能耗时): {original_img_url[:80]}...")
+                resp = requests.get(original_img_url, headers={"User-Agent": self.session.headers["User-Agent"]}, timeout=timeout)
+                # 10KB 以上认为有效（Pollinations 报错提示图往往很小）
+                if resp.status_code == 200 and len(resp.content) > 10240:
+                    image_content = resp.content
+                    valid_img_url = original_img_url
+                    logger.info("✅ 原始图片下载成功！")
+                else:
+                    logger.warning(f"⚠️ 图片下载失败或返回无额度提示图 (Size: {len(resp.content)} bytes)")
+            except Exception as e:
+                logger.warning(f"⚠️ 图片下载异常/超时: {e}")
+                
+        # 如果原始图失败，启动降级开源图库
+        if not image_content:
+            logger.info("🔄 原图不可用，正在从开源图库(Pexels/Pixabay)拉取关联图片...")
+            keywords = article.get('keywords', 'packaging box')
+            fallback_content, fallback_url = self._get_fallback_image(keywords)
+            
+            if fallback_content and fallback_url:
+                image_content = fallback_content
+                valid_img_url = fallback_url
+                logger.info(f"✅ 成功获取开源图库图片: {fallback_url[:60]}...")
+                
+                # 替换原文中的死链，保证前端显示正常
+                if original_img_url:
+                    html_content = html_content.replace(original_img_url, valid_img_url)
+                else:
+                    # 连 img 标签都没有，强制在首段插入
+                    alt_text = article.get('title', 'packaging')
+                    html_content = f'<p style="text-align: center;"><img src="{valid_img_url}" alt="{alt_text}" style="max-width: 100%; border-radius: 8px;"/></p>\n' + html_content
+            else:
+                logger.warning("❌ 所有开源图库均无响应，文章将无图发布。")
                     
         # 3. 构建多部分表单 (Multipart Form-Data)
         data_payload = {
