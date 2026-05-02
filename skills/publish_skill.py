@@ -37,3 +37,20 @@ class WellCMSPublishSkill(BaseSkill):
         except Exception as e:
             print(f"❌ [Skill: Publish] 失败: {e}")
             return {"success": False, "url": ""}
+
+    def open_session(self) -> bool:
+        """打开可复用的会话"""
+        return self.publisher.open_session()
+        
+    def publish_in_session(self, article: Dict) -> Dict:
+        """在已有会话中发布"""
+        try:
+            success, url = self.publisher.publish_in_session(article)
+            return {"success": success, "url": url}
+        except Exception as e:
+            print(f"❌ [Skill: Publish Session] 失败: {e}")
+            return {"success": False, "url": ""}
+            
+    def close_session(self):
+        """关闭复用会话"""
+        self.publisher.close_session()

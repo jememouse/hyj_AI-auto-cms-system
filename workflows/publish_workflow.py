@@ -80,108 +80,134 @@ class PublishWorkflow(BaseWorkflow):
         total_success = 0
         total_fail = 0
 
+        # [Account Allocation] 账号分堆聚合 (Session 复用机制)
+        account_groups = {}
         for idx, record in enumerate(pending_records):
-            print(f"\n--- [{idx + 1}/{len(pending_records)}] 发布: {record.get('Title', '')[:30]}... ---")
-
-            # [Idempotency Check] 防止重复发布
-            existing_url = record.get('URL', '').strip()
-            if existing_url and existing_url.startswith('http'):
-                gen_time_str = record.get('生成时间', '2000-01-01 00:00:00')
-                pub_time_str = record.get('发布时间', '')
-                try:
-                    gen_time = datetime.strptime(gen_time_str, "%Y-%m-%d %H:%M:%S")
-                    pub_time = datetime.min if not pub_time_str else datetime.strptime(pub_time_str, "%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    gen_time = datetime.max
-                    pub_time = datetime.min
-
-                if gen_time > pub_time:
-                    print(f"   🔄 [Stale Check] 检测到内容已重生成 (Gen: {gen_time_str} > Pub: {pub_time_str})")
-                    print(f"   🗑️ 忽略旧 URL，执行重新发布...")
-                else:
-                    print(f"   ⚠️ 已有有效 URL ({existing_url})，修复状态为 Published...")
-                    article_data_fix = {
-                        "title": record.get('Title'),
-                        "keywords": record.get('关键词'),
-                        "category_id": config.CATEGORY_MAP.get(str(record.get('大项分类', '')).strip(), "1"),
-                        "summary": record.get('摘要')
-                    }
-                    self.bus.mark_as_published(record['record_id'], article_data_fix, existing_url)
-                    print(f"   ✅ 状态修复完成，跳过重复发布。")
-                    continue
-
-            # [Data Integrity Check] 内容校验
-            title_chk = record.get('Title', '').strip()
-            content_chk = record.get('HTML_Content', '').strip()
-            if not title_chk or len(content_chk) < 50:
-                print(f"   🛑 无效内容 (Title: {bool(title_chk)}, Content: {len(content_chk)})，重置为 Ready...")
-                self.bus.mark_as_ready_to_retry(record['record_id'])
-                continue
-
-            # --- 解析 tags 和 summary 的逻辑 ---
-            raw_tags = str(record.get('Tags', ''))
-            parsed_tags = raw_tags
-            if raw_tags.startswith('[') and raw_tags.endswith(']'):
-                import json
-                try:
-                    tag_list = json.loads(raw_tags)
-                    if isinstance(tag_list, list):
-                        parsed_tags = ", ".join(str(t) for t in tag_list)
-                except Exception:
-                    pass
-            
-            summary_val = str(record.get('摘要', ''))
-            if summary_val == 'None':
-                summary_val = ''
-            one_line = str(record.get('One_Line_Summary', ''))
-            if one_line == 'None':
-                one_line = ''
-                
-            # 优先使用 One_Line_Summary 作为 brief，以防摘要被大模型充当成 "SEO Description..." 等无意义占位符
-            if one_line and len(one_line) > 5 and "SEO Description" not in one_line:
-                summary_val = one_line
-            elif not summary_val or "SEO Description" in summary_val:
-                summary_val = one_line
-
-            # [Publish] 账号 Round-Robin 轮换
-            article_data = {
-                "title": record.get('Title'),
-                "html_content": record.get('HTML_Content'),
-                "category_id": config.CATEGORY_MAP.get(str(record.get('大项分类', '')).strip(), "1"),
-                "summary": summary_val,
-                "keywords": record.get('关键词'),
-                "description": record.get('描述'),
-                "tags": parsed_tags
-            }
-
             account = self.active_accounts[idx % len(self.active_accounts)] if self.active_accounts else {}
             cur_user = account.get("username", config.WELLCMS_USERNAME)
             cur_pass = account.get("password", config.WELLCMS_PASSWORD)
-            print(f"   👤 [Account] 本次使用账号 ({idx + 1}): {cur_user}")
+            
+            if cur_user not in account_groups:
+                account_groups[cur_user] = {"password": cur_pass, "records": []}
+            account_groups[cur_user]["records"].append((idx, record))
 
+        for username, group_data in account_groups.items():
+            password = group_data["password"]
+            records = group_data["records"]
+            
+            print(f"\n🚀 [Session] 正在启动账号 {username}，本批次分配了 {len(records)} 篇文章")
+            
+            agent = PublisherAgent(username=username, password=password)
+            session_opened = agent.open_session()
+            
+            if not session_opened:
+                print(f"❌ [Session] 账号 {username} 登录失败，跳过该账号的 {len(records)} 篇文章")
+                total_fail += len(records)
+                for _ in range(len(records)):
+                    stats.record_failed() # 保证统计数字准确
+                continue
+                
             try:
-                agent = PublisherAgent(username=cur_user, password=cur_pass)
-                published_url = agent.publish_article(article_data)
+                for j, item in enumerate(records):
+                    idx, record = item
+                    print(f"\n--- [{idx + 1}/{len(pending_records)}] 发布: {record.get('Title', '')[:30]}... ---")
 
-                if published_url:
-                    self.bus.mark_as_published(record['record_id'], article_data, published_url)
-                    total_success += 1
-                    stats.record_published()
-                else:
-                    total_fail += 1
-                    stats.record_failed()
-                    print(f"   ❌ [Failed] 发布失败，未返回 URL")
-            except Exception as e:
-                total_fail += 1
-                stats.record_failed()
-                print(f"   ❌ [Error] 发布异常: {e}")
-                import traceback
-                traceback.print_exc()
+                    # [Idempotency Check] 防止重复发布
+                    existing_url = record.get('URL', '').strip()
+                    if existing_url and existing_url.startswith('http'):
+                        gen_time_str = record.get('生成时间', '2000-01-01 00:00:00')
+                        pub_time_str = record.get('发布时间', '')
+                        try:
+                            gen_time = datetime.strptime(gen_time_str, "%Y-%m-%d %H:%M:%S")
+                            pub_time = datetime.min if not pub_time_str else datetime.strptime(pub_time_str, "%Y-%m-%d %H:%M:%S")
+                        except Exception:
+                            gen_time = datetime.max
+                            pub_time = datetime.min
 
-            if idx < len(pending_records) - 1:
-                wait_time = random.uniform(0.5, 1.5)
-                print(f"   ⏳ 等待 {wait_time:.1f} 秒...")
-                time.sleep(wait_time)
+                        if gen_time > pub_time:
+                            print(f"   🔄 [Stale Check] 检测到内容已重生成 (Gen: {gen_time_str} > Pub: {pub_time_str})")
+                            print(f"   🗑️ 忽略旧 URL，执行重新发布...")
+                        else:
+                            print(f"   ⚠️ 已有有效 URL ({existing_url})，修复状态为 Published...")
+                            article_data_fix = {
+                                "title": record.get('Title'),
+                                "keywords": record.get('关键词'),
+                                "category_id": config.CATEGORY_MAP.get(str(record.get('大项分类', '')).strip(), "1"),
+                                "summary": record.get('摘要')
+                            }
+                            self.bus.mark_as_published(record['record_id'], article_data_fix, existing_url)
+                            print(f"   ✅ 状态修复完成，跳过重复发布。")
+                            continue
+
+                    # [Data Integrity Check] 内容校验
+                    title_chk = record.get('Title', '').strip()
+                    content_chk = record.get('HTML_Content', '').strip()
+                    if not title_chk or len(content_chk) < 50:
+                        print(f"   🛑 无效内容 (Title: {bool(title_chk)}, Content: {len(content_chk)})，重置为 Ready...")
+                        self.bus.mark_as_ready_to_retry(record['record_id'])
+                        continue
+
+                    # --- 解析 tags 和 summary 的逻辑 ---
+                    raw_tags = str(record.get('Tags', ''))
+                    parsed_tags = raw_tags
+                    if raw_tags.startswith('[') and raw_tags.endswith(']'):
+                        import json
+                        try:
+                            tag_list = json.loads(raw_tags)
+                            if isinstance(tag_list, list):
+                                parsed_tags = ", ".join(str(t) for t in tag_list)
+                        except Exception:
+                            pass
+                    
+                    summary_val = str(record.get('摘要', ''))
+                    if summary_val == 'None':
+                        summary_val = ''
+                    one_line = str(record.get('One_Line_Summary', ''))
+                    if one_line == 'None':
+                        one_line = ''
+                        
+                    # 优先使用 One_Line_Summary 作为 brief，以防摘要被大模型充当成 "SEO Description..." 等无意义占位符
+                    if one_line and len(one_line) > 5 and "SEO Description" not in one_line:
+                        summary_val = one_line
+                    elif not summary_val or "SEO Description" in summary_val:
+                        summary_val = one_line
+
+                    # [Publish]
+                    article_data = {
+                        "title": record.get('Title'),
+                        "html_content": record.get('HTML_Content'),
+                        "category_id": config.CATEGORY_MAP.get(str(record.get('大项分类', '')).strip(), "1"),
+                        "summary": summary_val,
+                        "keywords": record.get('关键词'),
+                        "description": record.get('描述'),
+                        "tags": parsed_tags
+                    }
+
+                    try:
+                        published_url = agent.publish_in_session(article_data)
+
+                        if published_url:
+                            self.bus.mark_as_published(record['record_id'], article_data, published_url)
+                            total_success += 1
+                            stats.record_published()
+                        else:
+                            total_fail += 1
+                            stats.record_failed()
+                            print(f"   ❌ [Failed] 发布失败，未返回 URL")
+                    except Exception as e:
+                        total_fail += 1
+                        stats.record_failed()
+                        print(f"   ❌ [Error] 发布异常: {e}")
+                        import traceback
+                        traceback.print_exc()
+
+                    if j < len(records) - 1:
+                        wait_time = random.uniform(1.0, 2.5)
+                        print(f"   ⏳ 同一账号连续发布，等待 {wait_time:.1f} 秒缓冲...")
+                        time.sleep(wait_time)
+            
+            finally:
+                agent.close_session()
 
         # [Notification] 发送飞书通知
         if total_success > 0 or total_fail > 0:
