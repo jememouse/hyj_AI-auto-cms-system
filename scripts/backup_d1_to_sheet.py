@@ -83,6 +83,13 @@ def backup():
             d1.execute_batch(queries[i:i+batch_size])
             
         print(f"🎉 归档大功告成！成功将 {len(records)} 条数据从 D1 热库转移至 Google Sheet 冷库。")
+        
+        # 4. 清理超过 3 天的已归档数据
+        print("\n>>> Step 4: 清理 D1 中超过 3 天的已归档数据...")
+        delete_sql = "DELETE FROM seo_articles WHERE is_archived = 1 AND created_at <= datetime('now', '-3 days')"
+        # 使用 execute 而非 execute_batch 因为这是单条指令
+        d1.execute(delete_sql)
+        print("✅ 3天前的历史数据已从 D1 中彻底清除，释放空间。")
     else:
         print("❌ 备份到 Google Sheet 失败，已中断流程，D1 数据将保留等待下次重试。")
 
