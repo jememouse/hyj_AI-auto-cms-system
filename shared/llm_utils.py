@@ -220,18 +220,9 @@ def call_llm_with_retry(
 
         return None  # 该通道所有重试均失败
 
-    # ── 🥇 主通道: DeepSeek 官方 (最高优先级, 支持 Thinking) ──
-    primary_model = model or config.LLM_MODEL
-    is_deepseek_model = not model or "deepseek" in (model or "").lower() or model == config.LLM_MODEL
-    print(f"   🚀 尝试使用 DeepSeek 主通道 ({primary_model})...")
-    result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, primary_model, "DeepSeek官方", enable_thinking=is_deepseek_model)
-    if result:
-        return result
-
-    # ── 🥈 二级备用通道: Google GenAI ──
-    if hasattr(config, 'GOOGLE_GENAI_API_KEY') and config.GOOGLE_GENAI_API_KEY:
-        use_google_model = model if model and ("gemma" in model.lower() or "gemini" in model.lower()) else getattr(config, 'GOOGLE_GENAI_MODEL', 'gemini-3.1-flash-lite-preview')
-        print(f"   🔄 DeepSeek 主通道失败，切换到 Google GenAI 备用通道 ({use_google_model})...")
+    def _try_google_genai(api_model: str, channel_name: str) -> Optional[str]:
+        if not (hasattr(config, 'GOOGLE_GENAI_API_KEY') and config.GOOGLE_GENAI_API_KEY):
+            return None
         try:
             from google import genai
             from google.genai import types
@@ -245,7 +236,7 @@ def call_llm_with_retry(
             for attempt in range(max_retries + 1):
                 try:
                     response = client.models.generate_content(
-                        model=use_google_model,
+                        model=api_model,
                         contents=prompt_text,
                         config=types.GenerateContentConfig(
                             temperature=temperature,
@@ -253,27 +244,55 @@ def call_llm_with_retry(
                         )
                     )
                     if response and response.text:
-                        print(f"   ✨ [Google GenAI] 调用成功")
+                        print(f"   ✨ [{channel_name}] 调用成功")
                         return response.text
                     else:
-                        print(f"   ⚠️ [Google GenAI] 响应为空")
+                        print(f"   ⚠️ [{channel_name}] 响应为空")
                 except Exception as e:
-                    print(f"   ❌ [Google GenAI] 请求异常 (尝试 {attempt + 1}/{max_retries + 1}): {e}")
+                    print(f"   ❌ [{channel_name}] 请求异常 (尝试 {attempt + 1}/{max_retries + 1}): {e}")
                 
                 if attempt < max_retries:
                     time.sleep(retry_delay * (attempt + 1))
         except ImportError:
-            print("   ⚠️ [Google GenAI] 未检测到 google-genai 库，请先执行 `pip install google-genai`。")
+            print(f"   ⚠️ [{channel_name}] 未检测到 google-genai 库，请先执行 `pip install google-genai`。")
         except Exception as e:
-            print(f"   ⚠️ [Google GenAI] 客户端初始化异常: {e}")
+            print(f"   ⚠️ [{channel_name}] 客户端初始化异常: {e}")
+        return None
+
+    # ── 动态通道路由 (根据模型名称前缀判定) ──
+    target_model = model or config.LLM_MODEL
+    is_gemini = "gemini" in target_model.lower() or "gemma" in target_model.lower()
+    
+    if is_gemini:
+        # Gemini 优先模式
+        print(f"   🚀 [动态路由] 检测到 Gemini 模型，优先走 Google GenAI 通道 ({target_model})...")
+        result = _try_google_genai(target_model, "Google GenAI 官方")
+        if result: return result
+        
+        # 降级到 DeepSeek
+        fallback_ds = "deepseek-v4-flash"
+        print(f"   🔄 Gemini 主通道失败，降级到 DeepSeek 备用通道 ({fallback_ds})...")
+        result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, fallback_ds, "DeepSeek官方", enable_thinking=True)
+        if result: return result
+        
+    else:
+        # DeepSeek 优先模式 (默认)
+        is_ds_model = "deepseek" in target_model.lower() or target_model == config.LLM_MODEL
+        print(f"   🚀 [动态路由] 优先走 DeepSeek 主通道 ({target_model})...")
+        result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, target_model, "DeepSeek官方", enable_thinking=is_ds_model)
+        if result: return result
+        
+        # 降级到 Gemini
+        fallback_gemini = getattr(config, 'GOOGLE_GENAI_MODEL', 'gemini-3.1-flash-lite-preview')
+        print(f"   🔄 DeepSeek 主通道失败，降级到 Google GenAI 备用通道 ({fallback_gemini})...")
+        result = _try_google_genai(fallback_gemini, "Google GenAI 官方")
+        if result: return result
 
     # ── 🥉 三级兜底通道: OpenRouter ──
     if config.FALLBACK_API_KEY:
-        print("   🔄 所有主通道失败，切换到 OpenRouter 兜底通道...")
-        fallback_model = config.FALLBACK_MODEL
-        result = _try_channel(config.FALLBACK_API_KEY, config.FALLBACK_API_URL, fallback_model, "OpenRouter兜底")
-        if result:
-            return result
+        print("   🔄 所有主/备通道失败，切换到 OpenRouter 兜底通道...")
+        result = _try_channel(config.FALLBACK_API_KEY, config.FALLBACK_API_URL, config.FALLBACK_MODEL, "OpenRouter兜底")
+        if result: return result
 
     print("   ❌ 所有通道均已失败")
     return ""
