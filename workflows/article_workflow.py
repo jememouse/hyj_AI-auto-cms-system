@@ -59,7 +59,7 @@ class ArticleWorkflow(BaseWorkflow):
 
         final_tags = article.get('tags')
         if is_priority:
-            priority_tag = "Top priority"
+            priority_tag = "盒艺家包装"
             if not final_tags:
                 final_tags = priority_tag
             elif isinstance(final_tags, list):
