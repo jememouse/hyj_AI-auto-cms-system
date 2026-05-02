@@ -101,11 +101,27 @@ def clean_published_rows(sheet_name: str = "cms", dry_run: bool = False):
     new_data = [headers] + keep_rows
     batch_size = 1000
 
+    # 带有重试机制的执行函数
+    def execute_with_retry(func, *args, **kwargs):
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                print(f"      ⚠️ 网络异常或 API 错误: {e}")
+                if attempt < max_retries - 1:
+                    sleep_time = 5 * (attempt + 1)
+                    print(f"      ⏳ 等待 {sleep_time} 秒后重试 ({attempt + 1}/{max_retries})...")
+                    time.sleep(sleep_time)
+                else:
+                    print("      ❌ 达到最大重试次数，放弃操作")
+                    raise e
+
     # 第 1 步: 分批覆盖写入新数据
     for i in range(0, len(new_data), batch_size):
         batch = new_data[i:i + batch_size]
         start_row = i + 1
-        sheet.update(range_name=f"A{start_row}", values=batch)
+        execute_with_retry(sheet.update, range_name=f"A{start_row}", values=batch)
         print(f"   📝 已写入 {min(i + batch_size, len(new_data))}/{len(new_data)} 行...")
         time.sleep(2)  # 防止 API 限流
 
@@ -115,7 +131,7 @@ def clean_published_rows(sheet_name: str = "cms", dry_run: bool = False):
     if old_total > new_total:
         # 删除从 new_total+1 到 old_total 的所有行
         print(f"   🗑️  清除尾部多余行: {new_total + 1} ~ {old_total}")
-        sheet.delete_rows(new_total + 1, old_total)
+        execute_with_retry(sheet.delete_rows, new_total + 1, old_total)
 
     print(f"\n✅ 工作表 '{sheet_name}' 清理完成！")
     print(f"   🗑️  已删除: {published_count} 行")
