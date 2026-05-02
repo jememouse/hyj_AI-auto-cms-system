@@ -33,30 +33,33 @@ class StateBus:
             else:
                 t['Status'] = config.STATUS_READY
 
-        # 2. 读取本地状态进行去重对比
-        existing_data = []
-        if os.path.exists(self.output_file):
-            with open(self.output_file, 'r', encoding='utf-8') as f:
-                try:
-                    existing_data = json.load(f)
-                except json.JSONDecodeError:
-                    pass
-
-        existing_topics = {item['Topic'] for item in existing_data}
+        # 2. 读取云端状态进行去重对比 (因为 Github Actions 是无状态容器，不能依赖本地 json)
+        existing_topics = set()
+        print("[StateBus] ☁️ 正在从 Google Sheet 获取历史文章进行云端去重比对...")
+        try:
+            # 简化：获取所有文章的标题
+            all_records = self.client._get_sheet("cms").get_all_records()
+            for r in all_records:
+                title = r.get("Title") or r.get("Topic") or ""
+                if title:
+                    existing_topics.add(title)
+            print(f"[StateBus] 📊 获取到 {len(existing_topics)} 个云端历史话题。")
+        except Exception as e:
+            print(f"[StateBus] ⚠️ 获取云端历史记录失败，退化为不完全去重: {e}")
         
-        # 3. 追加未处理过的记录到本地 JSON
+        # 3. 过滤重复记录
         added_count = 0
         added_topics = []
         for t in new_topics:
-            if t['Topic'] not in existing_topics:
-                existing_data.append(t)
+            topic = t.get('Topic')
+            if topic and topic not in existing_topics:
                 added_topics.append(t)
+                existing_topics.add(topic)
                 added_count += 1
+            else:
+                print(f"[StateBus] ⏭️ 话题已存在云端，跳过: {topic}")
         
         if added_count > 0:
-            with open(self.output_file, 'w', encoding='utf-8') as f:
-                json.dump(existing_data, f, ensure_ascii=False, indent=2)
-            print(f"[StateBus] 💾 发现独立新话题，结果已入库本地状态字典 (本次增援 {added_count} 条, 字典池子总计 {len(existing_data)} 条)。")
 
             # 4. 同步挂载到云端 Google Sheet
             print(f"[StateBus] ☁️ 正在推送 {added_count} 条新生代待处理任务给云端控制台流转...")
