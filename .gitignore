@@ -18,6 +18,10 @@ generated_seo_data.json
 generated_seo_data.json.bak
 n8n_data/
 .cache/
+/test_*.py
+/test_*.sh
+/debug_*.py
+/google-*
 
 # IDE & AI Assistants / Local Workspace
 .idea/
