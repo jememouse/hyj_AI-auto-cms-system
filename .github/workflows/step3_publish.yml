@@ -33,15 +33,6 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
-    - name: Install Playwright browsers
-      run: |
-        # 重建 apt-mirrors.txt 并写入官方源，解决 Ubuntu 24.04 镜像解析报错
-        sudo mkdir -p /etc/apt
-        echo "http://archive.ubuntu.com/ubuntu/" | sudo tee /etc/apt/apt-mirrors.txt
-        sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
-        sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list 2>/dev/null || true
-        sudo timeout 60s apt-get update || true
-        uv run playwright install chromium --with-deps
 
     - name: Run Step3 - RPA 发布 (${{ matrix.category }})
       env:
