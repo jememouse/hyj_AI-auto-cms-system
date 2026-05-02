@@ -8,9 +8,9 @@ load_dotenv()
 
 class D1Client:
     def __init__(self):
-        self.account_id = os.getenv("CF_ACCOUNT_ID")
-        self.db_id = os.getenv("CF_D1_DATABASE_ID")
-        self.token = os.getenv("CF_API_TOKEN")
+        self.account_id = os.getenv("CF_ACCOUNT_ID", "").strip()
+        self.db_id = os.getenv("CF_D1_DATABASE_ID", "").strip()
+        self.token = os.getenv("CF_API_TOKEN", "").strip()
         
         if not all([self.account_id, self.db_id, self.token]):
             print("⚠️ 警告: D1 环境变量缺失，请在 .env 中配置 CF_ACCOUNT_ID, CF_D1_DATABASE_ID, CF_API_TOKEN")
