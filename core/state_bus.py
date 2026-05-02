@@ -200,7 +200,8 @@ class StateBus:
                 "Title": r["topic"], 
                 "HTML_Content": r["content_body"],
                 "摘要": r["summary"],
-                "关键词": r["keywords"]
+                "关键词": r["keywords"],
+                "Tags": r["keywords"]
             }
         
         pending_records = [_map_to_old_dict(r) for r in records]
