@@ -46,6 +46,7 @@ FEISHU_WEBHOOK_URL = os.getenv("FEISHU_WEBHOOK_URL", "").strip()
 # Google Sheets Configuration
 GOOGLE_CREDENTIALS_FILE = os.path.join(PROJECT_ROOT, "service_account.json")
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "").strip()
+GOOGLE_SHEET_BACKUP_ID = os.getenv("GOOGLE_SHEET_BACKUP_ID", "").strip()
 GOOGLE_WORKSHEET_NAME = "cms" # Default
 
 # 社交媒体平台配置 (矩阵系统)

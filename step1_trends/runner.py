@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from . import fetch_trends
 from . import generate_topics
-from shared.google_client import GoogleSheetClient
+from shared.d1_client import D1Client
 from shared import config
 import json
 
@@ -43,25 +43,31 @@ def run():
         print("⚠️ 没有生成任何标题")
         return
     
-    # 转换为飞书格式
-    feishu_records = []
+    client = D1Client()
+    
+    # 转换为 D1 批量插入格式
+    queries = []
     for item in records:
-        feishu_records.append({
-            "Topic": item.get("Topic", ""),
-            "大项分类": item.get("大项分类", "行业资讯"),
-            "Status": config.STATUS_READY,  # 节点1完成: Ready
-            "标题生成时间": item.get("created_at", "")
-        })
+        sql = """
+        INSERT INTO seo_articles (source_trend, topic, category_name, status, created_at) 
+        VALUES (?, ?, ?, ?, ?)
+        """
+        params = [
+            item.get("Source_Trend", ""),
+            item.get("Topic", ""),
+            item.get("大项分类", "行业资讯"),
+            config.STATUS_READY,
+            item.get("created_at", "")
+        ]
+        queries.append({"sql": sql, "params": params})
+        
+    # 分批上传 (D1 一次 HTTP 可以处理上百条，这里设个100为一批)
+    batch_size = 100
+    for i in range(0, len(queries), batch_size):
+        batch = queries[i:i + batch_size]
+        client.execute_batch(batch)
     
-    client = GoogleSheetClient()
-    
-    # 分批上传
-    batch_size = 50
-    for i in range(0, len(feishu_records), batch_size):
-        batch = feishu_records[i:i + batch_size]
-        client.batch_create_records(batch)
-    
-    print(f"\n✅ 节点1完成！共上传 {len(feishu_records)} 条标题 (Status=Ready)")
+    print(f"\n✅ 节点1完成！共上传 {len(queries)} 条标题到 D1 数据库 (Status=Ready)")
 
 
 if __name__ == "__main__":

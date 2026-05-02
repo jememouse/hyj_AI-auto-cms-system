@@ -1,20 +1,18 @@
-name: Step1 - 热词搜索与标题生成
+name: Daily Backup - D1 to Google Sheet
 
 on:
   schedule:
-    # 工业级极速引擎：每3小时自动搜索全网热点（0次延误）
-    - cron: '0 */3 * * *'
+    # 每天北京时间凌晨 2:00 运行 (UTC时间 18:00)
+    - cron: '0 18 * * *'
   workflow_dispatch:  # 允许手动触发
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  step1-trends:
+  backup-d1:
     runs-on: ubuntu-latest
-    concurrency:
-      group: step1-trends
-      cancel-in-progress: false
+    timeout-minutes: 15
     
     steps:
     - name: Checkout code
@@ -28,21 +26,15 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
-    - name: Run Step1 - 热词搜索与标题生成
+    - name: Run Backup Script
       env:
-        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}
-        FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-        FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
-        FEISHU_BASE_ID: ${{ secrets.FEISHU_BASE_ID }}
         # Google Sheets Config
         GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-        GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
         GOOGLE_SHEET_BACKUP_ID: ${{ secrets.GOOGLE_SHEET_BACKUP_ID }}
+        # Cloudflare D1 Config
         CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         CF_D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
         CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-        FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
         TZ: 'Asia/Shanghai'
       run: |
-        uv run python -m step1_trends.agent_runner
+        uv run python scripts/backup_d1_to_sheet.py
