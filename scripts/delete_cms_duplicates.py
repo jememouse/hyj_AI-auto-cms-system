@@ -39,14 +39,18 @@ def run_delete_duplicates():
         list_url = f"{config.WELLCMS_ADMIN_URL}?0=content&1=list"
         
         deleted_count = 0
-        seen_titles = set()
+        seen_titles = {} # dict of title -> kept_tid
         
-        # 扫描前 5 页的内容（通常包含 24 小时内发布的文章）
-        for page_num in range(1, 6):
-            print(f"\n📄 正在扫描第 {page_num} 页...")
+        current_page = 1
+        max_page = 50
+        
+        # 使用 while 循环，解决删除数据后分页数据上移导致的漏扫问题
+        while current_page <= max_page:
+            print(f"\n📄 正在扫描第 {current_page} 页...")
             
             # 由于 WellCMS 分页可能是基于参数的，如果通过第一页的"下一页"按钮会更好
             # 我们先刷新当前列表页面
+            list_url = f"{config.WELLCMS_ADMIN_URL}?0=content&1=list&page={current_page}"
             publisher._safe_goto(list_url)
             time.sleep(2)
             
@@ -54,7 +58,7 @@ def run_delete_duplicates():
             target_frame = None
             for frame in publisher.page.frames:
                 try:
-                    frame.wait_for_selector("tr[data-tid]", timeout=3000)
+                    frame.wait_for_selector("li.thread[tid]", timeout=3000)
                     target_frame = frame
                     break
                 except:
@@ -82,21 +86,33 @@ def run_delete_duplicates():
             
             for i in range(count):
                 row = rows.nth(i)
+                tid = row.get_attribute("tid")
+                
                 # 尝试提取标题
                 try:
                     # 标题在 div.subject h2 a 里面
                     title_elem = row.locator("div.subject h2 a").first
                     if title_elem.count() > 0:
+                        # 替换掉可能包含的锁头图标等不可见字符
                         title = title_elem.inner_text().strip()
+                        # 去除开头的锁头图标
+                        if title.startswith("🔒"):
+                            title = title.replace("🔒", "").strip()
                     else:
                         title = row.inner_text().strip().split('\n')[0][:30]
+                        if title.startswith("🔒"):
+                            title = title.replace("🔒", "").strip()
                         
-                    if title:
+                    if title and tid:
                         if title in seen_titles:
-                            print(f"   🗑️ 发现重复文章: {title[:20]}...")
-                            to_delete_indexes.append(i)
+                            if seen_titles[title] == tid:
+                                # 这是我们保留的那一份，跳过
+                                pass
+                            else:
+                                print(f"   🗑️ 发现重复文章 (tid={tid}): {title[:20]}...")
+                                to_delete_indexes.append(i)
                         else:
-                            seen_titles.add(title)
+                            seen_titles[title] = tid
                 except Exception as e:
                     pass
             
@@ -146,9 +162,11 @@ def run_delete_duplicates():
             
             # 翻页逻辑
             try:
-                # 直接拼接下一页的 URL 更加稳定
-                list_url = f"{config.WELLCMS_ADMIN_URL}?0=content&1=list&page={page_num+1}"
-                print(f"   ➡️ 准备进入下一页: {list_url}")
+                if to_delete_indexes:
+                    print(f"   🔄 数据已刷新，继续扫描第 {current_page} 页...")
+                else:
+                    current_page += 1
+                    print(f"   ➡️ 准备进入第 {current_page} 页...")
             except Exception as e:
                 print(f"   ❌ 翻页失败: {e}")
                 break
