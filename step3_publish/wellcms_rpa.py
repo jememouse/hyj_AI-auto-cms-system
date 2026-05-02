@@ -622,161 +622,73 @@ class WellCMSPublisher:
                 logger.error(f"封面图逻辑错误: {e}")
             # -------------------------------------------------------------------
             
-            # 填写 SEO 字段 (使用 fill 触发事件，若元素不可见则用 evaluate 强制赋值)
-            seo_data = {
-                '#brief, textarea[name="brief"]': article.get('summary', ''),
-                '#keyword, input[name="keyword"]': article.get('keywords', ''),
-                '#description, textarea[name="description"]': article.get('description', '')
+            # ===================================================================
+            # ⚡ 极速 JS 注入模式 (B计划)
+            # ===================================================================
+            html_content = article.get('html_content', '')
+            
+            # 🚨 过滤掉所有 4字节字符 (Emoji) 防止 MySQL 截断
+            html_content = "".join(c for c in html_content if ord(c) <= 65535)
+            
+            form_data = {
+                "brief": article.get('summary', ''),
+                "keyword": article.get('keywords', ''),
+                "description": article.get('description', ''),
+                "tags": article.get('tags', article.get('keywords', '')),
+                "message": html_content
             }
             
-            for selector, value in seo_data.items():
-                if value:
-                    try:
-                        self.page.locator(selector).first.fill(value, timeout=2000)
-                    except Exception as e:
-                        try:
-                            # 兜底：如果元素不可见（例如在折叠面板中），使用 JS 强制渲染并派发事件
-                            self.page.locator(selector).first.evaluate(
-                                "(el, val) => { el.value = val; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); }",
-                                value
-                            )
-                            print(f"      🛡️ 强制注入 SEO 字段 (不可见元素): {selector}")
-                        except Exception as inner_e:
-                            print(f"      ⚠️ 填写 SEO 字段失败 {selector}: {inner_e}")
+            print("      ⚡ 启动底层 JS 极速数据注入...")
             
-            # 勾选"禁止评论"
-            self.page.evaluate("""() => {
+            self.page.evaluate('''((data) => {
+                const setVal = (sel, val) => {
+                    const el = document.querySelector(sel);
+                    if (el && val) {
+                        el.value = val;
+                        el.dispatchEvent(new Event('input', {bubbles: true}));
+                        el.dispatchEvent(new Event('change', {bubbles: true}));
+                    }
+                };
+                
+                setVal('textarea[name="brief"]', data.brief);
+                setVal('input[name="keyword"]', data.keyword);
+                setVal('textarea[name="description"]', data.description);
+                
+                ['#tags', '#tag', 'input[name="tags"]', 'input[name="tag"]'].forEach(sel => {
+                    setVal(sel, data.tags);
+                });
+                
                 const closedBox = document.querySelector('#closed-box');
                 if (closedBox && !closedBox.checked) {
                     closedBox.click();
                 }
-            }""")
+                
+                const messageHtml = data.message;
+                const msgArea = document.querySelector('textarea[name="message"]');
+                if (msgArea) msgArea.value = messageHtml;
+                
+                if (typeof UM !== 'undefined' && UM.getEditor('message')) {
+                    UM.getEditor('message').setContent(messageHtml);
+                } else if (typeof UE !== 'undefined' && UE.getEditor('message')) {
+                    UE.getEditor('message').setContent(messageHtml);
+                } else {
+                    for (let key in window) {
+                        if (window[key] && window[key].key === 'message' && window[key].setContent) {
+                            window[key].setContent(messageHtml);
+                            break;
+                        }
+                    }
+                }
+            })''', form_data)
+            
             time.sleep(0.5)
             
-            # 填写 tags (兼容多个常见命名，处理 type="hidden" 等不可见元素的情况)
-            tags = article.get('tags', '')
-            if tags:
-                try:
-                    tag_selector = '#tags, #tag, input[name="tags"], input[name="tag"]'
-                    try:
-                        self.page.locator(tag_selector).first.fill(tags, timeout=2000)
-                        # 某些标签系统需要按回车才能生成数据块
-                        self.page.keyboard.press('Enter')
-                    except Exception:
-                        # 兜底：如果 tags 框是不可见的 (如 type="hidden" 插件)，直接强插
-                        self.page.locator(tag_selector).first.evaluate(
-                            "(el, val) => { el.value = val; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); }",
-                            tags
-                        )
-                    print(f"      🏷️ 已填写 tags: {tags}")
-                except Exception as e:
-                    print(f"      ⚠️ 填写 tags 失败: {e}")
-            time.sleep(0.5)
-            
-            # 填写正文 (UEditor) - 增强版
-            html_content = article.get('html_content', '')
-            
-            # 🚨 关键修复：移除 4字节字符 (Emoji)
-            # 原因：MySQL utf8 编码不支持 Emoji，会导致保存时从 Emoji 处被截断
-            # 匹配所有 Unicode 代理对 (Surrogate Pairs) 和非 BMP 字符
+            print("      🖱️ 极速触发提交事件...")
             try:
-                # 过滤掉所有 ord > 65535 的字符
-                html_content = "".join(c for c in html_content if ord(c) <= 65535)
-                print("      🛡️ 已过滤 4字节字符 (Emoji) 以防截断")
+                with self.page.expect_navigation(timeout=30000):
+                    self.page.evaluate("document.getElementById('submit').click();")
             except Exception as e:
-                print(f"      ⚠️ 字符过滤异常: {e}")
-
-            # 恢复图片功能 (之前误判为图片导致截断，实际是 Emoji)
-            # 这里的图片 URL 已经在 Step 2 被转义过 &amp; 了，安全。
-            
-            # 多次尝试注入内容
-            injection_successful = False
-            for attempt in range(3):
-                try:
-                    # 尝试注入
-                    inject_success = False
-                    
-                    # 方案 1: 标准 API 注入 (并在注入后读取验证)
-                    result_len = self.page.evaluate("""(content) => {
-                        var editor = null;
-                        if (typeof UM !== 'undefined') {
-                            editor = UM.getEditor('message');
-                        } else if (typeof UE !== 'undefined') {
-                            editor = UE.getEditor('message');
-                        }
-                        
-                        if (editor) {
-                            editor.setContent(content);
-                            return editor.getContent().length; // 返回注入后的长度
-                        }
-                        return -1;
-                    }""", html_content)
-                    
-                    # 验证注入结果
-                    if result_len > len(html_content) * 0.5: # 允许少许差异（HTML格式化），但不能太短
-                        print(f"      📝 内容注入成功 (长度: {result_len}/{len(html_content)})")
-                        inject_success = True
-                    elif result_len != -1:
-                        print(f"      ⚠️ 内容注入疑似截断 (长度差异大: {result_len}/{len(html_content)})，尝试备用方案...")
-                        # 只有当 API 注入失败或截断时，才走下面的 fallback
-                    
-                    # 方案 2: 备用 - Frame 直接注入 (如果标准 API 失败)
-                    if not inject_success:
-                        # 查找编辑器 iframe
-                        frames = self.page.frames
-                        target_frame = None
-                        for frame in frames:
-                            if "ueditor" in frame.name or "message" in frame.name:
-                                target_frame = frame
-                                break
-                        
-                        if target_frame:
-                            # 直接写入 iframe body
-                            escaped_content = html_content.replace("`", "\\`")
-                            target_frame.evaluate(f"document.body.innerHTML = `{escaped_content}`")
-                            # 同步回 textarea (尝试触发编辑器的 sync)
-                            self.page.evaluate("""() => {
-                                if (typeof UM !== 'undefined') UM.getEditor('message').sync();
-                                if (typeof UE !== 'undefined') UE.getEditor('message').sync();
-                            }""")
-                            print("      📝 使用 iframe 直接注入 (Force Mode)")
-                            inject_success = True
-                    
-                    # 方案 3: Textarea 兜底 (Source Mode)
-                    if not inject_success:
-                         self.page.fill('textarea[name="message"]', html_content)
-                         print("      📝 使用 Textarea 注入")
-                         inject_success = True
-
-                    if inject_success:
-                        time.sleep(2) # 注入后等待渲染
-                        injection_successful = True
-                        break
-                except Exception as e:
-                    logger.warning(f"注入异常 (尝试 {attempt + 1}/3): {e}")
-                    time.sleep(2)
-            
-            time.sleep(2)
-            
-            # 点击提交
-            # 点击提交并等待跳转
-            # 🚨 终极保险：强制将内容同步到 textarea
-            # 无论之前的注入方式如何，提交前必须确保 textarea 有值，因为表单提交的是 textarea
-            escaped_html = html_content.replace('`', '\\`')
-            self.page.evaluate(f"""() => {{
-                var el = document.querySelector('textarea[name="message"]');
-                if (el) {{
-                    el.value = `{escaped_html}`;
-                }}
-            }}""")
-            print("      🛡️ 已强制同步内容到 Textarea")
-
-            # 点击提交按钮
-            try:
-                with self.page.expect_navigation(timeout=60000):
-                    self.page.click('#submit')
-            except Exception as e:
-                print(f"      ⚠️ 等待跳转超时或失败，尝试根据当前 URL 判断: {e}")
+                print(f"      ⚠️ 等待跳转超时或失败，尝试根据当前 URL 继续: {e}")
             
             # -------------------------------------------------------------------
             # 🔗 URL 修正逻辑 (修复 "Same Link" Bug)
