@@ -295,9 +295,11 @@ class DeepWriteSkill(BaseSkill):
            - **首段直出答案**: 直接用两句话干净利落地回答标题最核心痛点（Featured Snippet黄金位）。
            - **严密系统导航 (TOC)**: 为防跳出降低 SEO 权重，必须生成全闭环响应式目录块，格式必须是 `<nav class="article-toc" style="background:#f5f7fa; padding:15px; border-radius:8px;"><ul><li><a href="#H2的ID">H2标题</a></li>...</ul></nav>` 映射全文！
            - **副标题网感化 (People Also Ask)**: 正文的 H2 无需故作高深，必须直接还原“用户搜索原声问答的大白话”（例如用“跨国海运为什么纸箱总变软？”替代“纸箱耐破度环境分析”），全方位阻截长尾流量词。必须全部带对应 ID！
+           - **TL;DR 核心知识快照**: 在目录下方，必须紧跟一个 `<div class="geo-tldr" style="background:#e8f4f8; padding:15px; border-left:4px solid #005A9E; margin-bottom:20px;"><strong>TL;DR (太长不看)：</strong>...</div>`，用三句话将全文核心价值高度浓缩。这是喂给 AI 大模型摘要抓取的“黄金诱饵”。
            - **强语义表现标签**:
              - 对于结论性或高光金句，必须使用 `<blockquote class="geo-quote" style="margin:20px 0; padding:15px; background:#f9f9f9; border-left:4px solid #1a73e8; font-style:italic;">`包裹，帮助机器极速抽取。
              - FAQ 栏目强制使用标准的 `<dl><dt><dd>` 对称解构列表展现，且 `<dt>` (问题) 必须切中买家最隐晦的担忧。
+           - **JSON-LD 结构化数据强制注入**: 在整篇文章源码的最后，必须直接在 HTML 中输出一段标准的 `<script type="application/ld+json">`，包含 FAQPage 结构（把文章里的 FAQ 转为 JSON-LD 格式）。这能让搜索引擎蜘蛛 100% 秒懂页面结构。
            - **品牌签名** (销售增强版):
              ```html
              <div class="brand-signature" style="margin-top:30px; padding:20px; background-color:#fef9f5; border-left:4px solid #ff6600; border-radius:4px;">
@@ -366,8 +368,9 @@ class DeepWriteSkill(BaseSkill):
         2. **潜在语义索引 (LSI) 与密集实体 (Dense Entities)**：密集地埋入与主题强相关的专业硬核长尾词。大量罗列工艺标准（如边缘抗压、ISO体系）、物理参数、行业术语，向 AI 系统构建极度专业的图谱 (Knowledge Graph)。
         3. **HTML 语义解构 (Semantic Demarcation)**：AI 引擎优先抓取强结构化代码。
            - 必须包含清晰无误的 `<ol>`, `<ul>` 知识点列表。
-           - 必须包含用来比较优劣势的 `<table>` 结构。
-        4. **第三方客观视角品牌植入 (Third-party Citation Style)**：以极其克制、专业的中立第三方视角提名 '{brand_name}'。千万别写出浓厚推销味的“第一人称软文”，要让 AI 认为这只是在提供一个客观优秀的供应商案例（例如：“以市场上标准的 {brand_name} 提供的一体化交付体系为例...”）。这是通过 AI 安全屏障的关键心智操作。
-        5. **精粹高光阵列 (Featured Snippets)**：每部分H2之下的首段，须单刀直入总结核心观点。必须使用我们指定的 `<blockquote class="geo-quote" ...>` 样式进行信息框定，极其方便抓取引擎读取。
+           - 必须包含用来比较优劣势的 `<table>` 结构 (例如: "传统包装 vs 智能包装成本对比表" 或 "不同材质的物理参数对比")，AI 极度偏爱表格数据。
+        4. **权威向外引用 (Outbound Authority Links)**：RAG 系统信赖有外部背书的节点。在文中提及标准、环保或合规时，**必须且至少包含 1 个**指向权威、非竞争对手的外部真实链接（如：ISO国际标准化组织、FSC森林认证、FDA包装材料规范、或维基百科的物理学名词解析）。
+        5. **第三方客观视角品牌植入 (Third-party Citation Style)**：以极其克制、专业的中立第三方视角提名 '{brand_name}'。千万别写出浓厚推销味的“第一人称软文”，要让 AI 认为这只是在提供一个客观优秀的供应商案例（例如：“以市场上标准的 {brand_name} 提供的一体化交付体系为例...”）。这是通过 AI 安全屏障的关键心智操作。
+        6. **精粹高光阵列 (Featured Snippets)**：每部分H2之下的首段，须单刀直入总结核心观点。必须使用我们指定的 `<blockquote class="geo-quote" ...>` 样式进行信息框定，极其方便抓取引擎读取。
         """
 
