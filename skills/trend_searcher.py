@@ -73,10 +73,10 @@ class TrendSearchSkill(BaseSkill):
 
                 pull_limit = 20
                 
-                # 兼容两种状态：留空 ("") 或者填了 "Unused"
-                unused_records = client.fetch_records_by_status("", limit=pull_limit, table_id="keywords_lib")
+                # 兼容两种状态：留空 ("") 或者填了 "Unused"，并开启 reverse=True 实现“先进后出”(LIFO) 优先抽取最新添加的词库
+                unused_records = client.fetch_records_by_status("", limit=pull_limit, table_id="keywords_lib", reverse=True)
                 if len(unused_records) < pull_limit:
-                    unused_records.extend(client.fetch_records_by_status("Unused", limit=pull_limit - len(unused_records), table_id="keywords_lib"))
+                    unused_records.extend(client.fetch_records_by_status("Unused", limit=pull_limit - len(unused_records), table_id="keywords_lib", reverse=True))
                     
                 externals = []
                 new_pending_records = []
