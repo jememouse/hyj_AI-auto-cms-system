@@ -86,6 +86,10 @@ class TrendSearchSkill(BaseSkill):
                         kw = str(r.get("Keyword", "")).strip()
                         if kw:
                             externals.append(f"[外部指定] {kw}")
+                            # 同时将这个外部热词追加到长尾挖掘的种子库中，让小红书等平台基于它去裂变
+                            if kw not in mining_seeds:
+                                mining_seeds.append(kw)
+                                
                             # 立即标记该单元格为 Used 并填入使用时间，完成滴灌闭环
                             rec_id = r.get("record_id")
                             if rec_id:
