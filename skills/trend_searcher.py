@@ -278,7 +278,13 @@ class TrendSearchSkill(BaseSkill):
                     suggestions.extend([f"[搜索需求] {w}" for w in words])
             except Exception as e:
                 logger.debug(f"[百度建议] {seed} 抓取失败: {e}")
-        return suggestions
+        
+        scenes = ["工艺标准", "成本核算公式", "全套图文详解", "避坑指南", "干货教程"]
+        import random
+        for seed in random.sample(seeds, min(4, len(seeds))):
+            for s in random.sample(scenes, 2):
+                suggestions.append(f"[搜索需求] {seed}{s}")
+        return list(set(suggestions))
 
     def _fetch_1688_suggestions(self, seeds):
         suggestions = []
@@ -292,7 +298,12 @@ class TrendSearchSkill(BaseSkill):
                     suggestions.extend([f"[1688采购] {i['q']}" for i in data['result'][:5]])
              except Exception as e:
                 logger.debug(f"[1688建议] {seed} 抓取失败: {e}")
-        return suggestions
+                
+        scenes = ["源头工厂防坑", "出厂价揭秘", "代工内幕", "材质鉴别", "批发套路"]
+        for seed in random.sample(seeds, min(3, len(seeds))):
+            for s in random.sample(scenes, 2):
+                suggestions.append(f"[1688采购] {seed}{s}")
+        return list(set(suggestions))
 
     def _fetch_taobao_suggestions(self, seeds):
         suggestions = []
@@ -306,7 +317,12 @@ class TrendSearchSkill(BaseSkill):
                     suggestions.extend([f"[淘宝热搜] {i[0]}" for i in data['result'][:5]])
             except Exception as e:
                 logger.debug(f"[淘宝建议] {seed} 抓取失败: {e}")
-        return suggestions
+                
+        scenes = ["定制猫腻", "工厂实拍", "好物测评", "材质对比报告"]
+        for seed in random.sample(seeds, min(3, len(seeds))):
+            for s in random.sample(scenes, 2):
+                suggestions.append(f"[淘宝热搜] {seed}{s}")
+        return list(set(suggestions))
     
     def _fetch_zhihu_hot_questions(self, seeds):
         questions = []
@@ -327,6 +343,11 @@ class TrendSearchSkill(BaseSkill):
                                 questions.append(f"[知乎问答] {clean}")
             except Exception as e:
                 logger.debug(f"[知乎问答] {seed} 抓取失败: {e}")
+                
+        scenes = ["背后的逻辑", "如何避坑", "行业内幕揭秘", "硬核科普", "成本底线"]
+        for seed in random.sample(seeds, min(3, len(seeds))):
+            for s in random.sample(scenes, 2):
+                questions.append(f"[知乎问答] {seed}{s}")
         return list(set(questions))
 
     def _fetch_xiaohongshu_trends(self, seeds):
@@ -347,8 +368,9 @@ class TrendSearchSkill(BaseSkill):
             except Exception as e:
                 logger.debug(f"[小红书] {seed} 抓取失败: {e}")
         
-        scenes = ["开箱体验","送礼推荐","高级感包装"]
-        for seed in random.sample(seeds, min(3, len(seeds))):
+        # 偏向硬核专业知识与小红书高赞收录类型
+        scenes = ["避坑指南", "成本揭秘", "干货分享", "材质对比", "印刷工艺解析", "工厂实拍防坑", "源头揭秘"]
+        for seed in random.sample(seeds, min(4, len(seeds))):
             for s in random.sample(scenes, 2):
                 trends.append(f"[小红书] {seed}{s}")
         return list(set(trends))
