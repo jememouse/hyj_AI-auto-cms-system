@@ -160,9 +160,9 @@ def call_llm_with_retry(
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        if "deepseek" in api_url or "openrouter" in api_url:
-            headers["HTTP-Referer"] = "https://github.com/jememouse/deepseek-feisu-cms"
-            headers["X-Title"] = "DeepSeek CMS Agent"
+        if "deepseek" in api_url or "openrouter" in api_url or "xiaomimimo" in api_url:
+            headers["HTTP-Referer"] = "https://github.com/jememouse/AI-auto-cms-system"
+            headers["X-Title"] = "AI CMS System Agent"
         return headers
 
     def _try_channel(api_key: str, api_url: str, api_model: str, channel_name: str, enable_thinking: bool = False) -> Optional[str]:
@@ -175,7 +175,7 @@ def call_llm_with_retry(
             "max_tokens": 8192
         }
 
-        # DeepSeek Thinking 模式注入
+        # Thinking 模式参数注入 (MiMo / DeepSeek 兼容)
         if enable_thinking and getattr(config, 'DEEPSEEK_THINKING_ENABLED', False):
             reasoning_effort = getattr(config, 'DEEPSEEK_REASONING_EFFORT', 'high')
             payload["thinking"] = {"type": "enabled"}
@@ -269,22 +269,22 @@ def call_llm_with_retry(
         result = _try_google_genai(target_model, "Google GenAI 官方")
         if result: return result
         
-        # 降级到 DeepSeek
-        fallback_ds = "deepseek-v4-flash"
-        print(f"   🔄 Gemini 主通道失败，降级到 DeepSeek 备用通道 ({fallback_ds})...")
-        result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, fallback_ds, "DeepSeek官方", enable_thinking=True)
+        # 降级到 主通道
+        fallback_ds = config.LLM_MODEL
+        print(f"   🔄 Gemini 主通道失败，降级到系统主通道 ({fallback_ds})...")
+        result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, fallback_ds, "系统主通道", enable_thinking=True)
         if result: return result
         
     else:
-        # DeepSeek 优先模式 (默认)
-        is_ds_model = "deepseek" in target_model.lower() or target_model == config.LLM_MODEL
-        print(f"   🚀 [动态路由] 优先走 DeepSeek 主通道 ({target_model})...")
-        result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, target_model, "DeepSeek官方", enable_thinking=is_ds_model)
+        # 主通道优先模式 (默认 MiMo/DeepSeek)
+        is_ds_model = "deepseek" in target_model.lower() or "mimo" in target_model.lower() or target_model == config.LLM_MODEL
+        print(f"   🚀 [动态路由] 优先走系统主通道 ({target_model})...")
+        result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, target_model, "系统主通道", enable_thinking=is_ds_model)
         if result: return result
         
         # 降级到 Gemini
         fallback_gemini = getattr(config, 'GOOGLE_GENAI_MODEL', 'gemini-3.1-flash-lite-preview')
-        print(f"   🔄 DeepSeek 主通道失败，降级到 Google GenAI 备用通道 ({fallback_gemini})...")
+        print(f"   🔄 主通道失败，降级到 Google GenAI 备用通道 ({fallback_gemini})...")
         result = _try_google_genai(fallback_gemini, "Google GenAI 官方")
         if result: return result
 

@@ -10,16 +10,17 @@ load_dotenv()
 # 项目根目录
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# LLM API 配置 (DeepSeek V4 最高优先级 → Google GenAI 备用 → OpenRouter 兜底)
+# LLM API 配置 (Xiaomi MiMo 最高优先级 → DeepSeek 备用 → Google GenAI 备用 → OpenRouter 兜底)
+MIMO_API_KEY = os.getenv("MIMO_API_KEY", "").strip()
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 
-# 主通道 (最高优先级): DeepSeek 官方直连 + Thinking 模式
-LLM_API_KEY = DEEPSEEK_API_KEY
-LLM_API_URL = "https://api.deepseek.com/v1/chat/completions"
-LLM_MODEL = "deepseek-v4-flash"
+# 主通道 (最高优先级): Xiaomi MiMo (支持高并发极速思考)
+LLM_API_KEY = MIMO_API_KEY
+LLM_API_URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
+LLM_MODEL = "mimo-v2.5-pro"
 
-# DeepSeek Thinking 模式配置
+# 兼容模型 Thinking 模式配置 (支持 MiMo / DeepSeek)
 DEEPSEEK_THINKING_ENABLED = True   # 开启思考模式 (思维链推理)
 DEEPSEEK_REASONING_EFFORT = "high" # 思考强度: "high" (默认) 或 "max" (复杂任务)
 
@@ -28,8 +29,8 @@ GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY", "").strip()
 GOOGLE_GENAI_MODEL = "gemini-3.1-flash-lite-preview"
 
 # 业务解耦模型设置 (可被环境变量覆写)
-TITLE_MODEL = os.getenv("TITLE_MODEL", GOOGLE_GENAI_MODEL)          # 标题生成
-ARTICLE_MODEL = os.getenv("ARTICLE_MODEL", GOOGLE_GENAI_MODEL)      # 长文写作
+TITLE_MODEL = os.getenv("TITLE_MODEL", "mimo-v2.5")             # 标题生成 (采用速度极快的标准版)
+ARTICLE_MODEL = os.getenv("ARTICLE_MODEL", LLM_MODEL)           # 长文写作 (采用逻辑极强的 Pro 版)
 
 # 三级兜底通道: OpenRouter (所有通道失败后最终兜底)
 FALLBACK_API_KEY = OPENROUTER_API_KEY

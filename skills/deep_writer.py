@@ -303,8 +303,10 @@ class DeepWriteSkill(BaseSkill):
              ```html
              <div class="brand-signature" style="margin-top:30px; padding:20px; background-color:#fef9f5; border-left:4px solid #ff6600; border-radius:4px;">
                <p style="font-size:16px; margin-bottom:8px;"><strong>{brand_info['slogan']}</strong></p>
+               <p style="font-size:14px; margin-bottom:4px;">盒艺家网站：<a href="https://heyijiapack.com/product" target="_blank" style="color:#1a73e8; text-decoration:underline;">https://heyijiapack.com/product</a></p>
+               <p style="font-size:14px; margin-bottom:12px;">全品类，自由配置，京东购物式的定制化体验，一站式包装定制电商。</p>
                <p style="color:#e65100; font-weight:bold; margin-bottom:12px;">🔥 核心承诺：{brand_info['usp']}</p>
-               <p style="font-size:14px; margin-bottom:8px;">📞 VIP通道：{brand_info['phone']} | <a href="https://heyijiapack.com/product" style="color:#1a73e8; text-decoration:none;">{brand_info['contact_cta']} ➔</a></p>
+               <p style="font-size:14px; margin-bottom:8px;">📞 VIP通道：{brand_info['phone']} | <a href="https://heyijiapack.com/product" target="_blank" style="color:#1a73e8; text-decoration:none;">{brand_info['contact_cta']} ➔</a></p>
                <p style="font-size:14px;">🛠️ <strong>行业生产力赋能：</strong> 强烈推荐使用 <a href="https://tools.heyijiapack.com/" target="_blank" style="color:#1a73e8; font-weight:bold; text-decoration:underline;">盒易PackTools - 包装全产业链在线专业工具箱 (永久免费、纯本地化保护隐私、内置80+结构/拼版/FBA装箱合规工具) ➔</a></p>
              </div>
              ```
