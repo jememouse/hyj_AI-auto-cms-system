@@ -15,27 +15,36 @@ MIMO_API_KEY = os.getenv("MIMO_API_KEY", "").strip()
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 
-# 主通道 (最高优先级): Xiaomi MiMo (支持高并发极速思考)
-LLM_API_KEY = MIMO_API_KEY
-LLM_API_URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
-LLM_MODEL = "mimo-v2.5"
+# 级联通道配置
+# 1. 优先主通道: Xiaomi MiMo
+MIMO_API_URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
+MIMO_MODEL = "mimo-v2.5"
+
+# 2. 二级备用通道: DeepSeek 官方直连
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_MODEL = "deepseek-v4-flash"
 
 # 兼容模型 Thinking 模式配置 (支持 MiMo / DeepSeek)
-DEEPSEEK_THINKING_ENABLED = True   # 开启思考模式 (思维链推理)
-DEEPSEEK_REASONING_EFFORT = "high" # 思考强度: "high" (默认) 或 "max" (复杂任务)
+LLM_THINKING_ENABLED = True   # 开启思考模式 (思维链推理)
+LLM_REASONING_EFFORT = "high" # 思考强度: "high" (默认) 或 "max" (复杂任务)
 
-# 二级备用通道: Google GenAI (当主通道失败后切换)
+# 3. 三级备用通道: Google GenAI (当上述通道失败后切换)
 GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY", "").strip()
 GOOGLE_GENAI_MODEL = "gemini-3.1-flash-lite-preview"
 
 # 业务解耦模型设置 (可被环境变量覆写)
-TITLE_MODEL = os.getenv("TITLE_MODEL", "mimo-v2.5")             # 标题生成 (采用速度极快的标准版)
-ARTICLE_MODEL = os.getenv("ARTICLE_MODEL", LLM_MODEL)           # 长文写作 (采用逻辑极强的 Pro 版)
+TITLE_MODEL = os.getenv("TITLE_MODEL", MIMO_MODEL)             
+ARTICLE_MODEL = os.getenv("ARTICLE_MODEL", MIMO_MODEL)           
 
-# 三级兜底通道: OpenRouter (所有通道失败后最终兜底)
+# 4. 四级兜底通道: OpenRouter (所有通道失败后最终兜底)
 FALLBACK_API_KEY = OPENROUTER_API_KEY
 FALLBACK_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 FALLBACK_MODEL = "deepseek/deepseek-v4-flash"
+
+# 兼容旧代码变量调用
+LLM_API_KEY = MIMO_API_KEY
+LLM_API_URL = MIMO_API_URL
+LLM_MODEL = MIMO_MODEL
 
 # 飞书配置
 FEISHU_APP_ID = os.getenv("FEISHU_APP_ID", "").strip()

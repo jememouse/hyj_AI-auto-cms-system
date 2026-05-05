@@ -176,8 +176,8 @@ def call_llm_with_retry(
         }
 
         # Thinking 模式参数注入 (MiMo / DeepSeek 兼容)
-        if enable_thinking and getattr(config, 'DEEPSEEK_THINKING_ENABLED', False):
-            reasoning_effort = getattr(config, 'DEEPSEEK_REASONING_EFFORT', 'high')
+        if enable_thinking and (getattr(config, 'LLM_THINKING_ENABLED', False) or getattr(config, 'DEEPSEEK_THINKING_ENABLED', False)):
+            reasoning_effort = getattr(config, 'LLM_REASONING_EFFORT', getattr(config, 'DEEPSEEK_REASONING_EFFORT', 'high'))
             payload["thinking"] = {"type": "enabled"}
             payload["reasoning_effort"] = reasoning_effort
             # Thinking 模式下需要更大的 max_tokens (包含思维链输出)
@@ -260,7 +260,7 @@ def call_llm_with_retry(
         return None
 
     # ── 动态通道路由 (根据模型名称前缀判定) ──
-    target_model = model or config.LLM_MODEL
+    target_model = model or getattr(config, 'LLM_MODEL', 'mimo-v2.5')
     is_gemini = "gemini" in target_model.lower() or "gemma" in target_model.lower()
     
     if is_gemini:
@@ -269,22 +269,32 @@ def call_llm_with_retry(
         result = _try_google_genai(target_model, "Google GenAI 官方")
         if result: return result
         
-        # 降级到 主通道
-        fallback_ds = config.LLM_MODEL
-        print(f"   🔄 Gemini 主通道失败，降级到系统主通道 ({fallback_ds})...")
-        result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, fallback_ds, "系统主通道", enable_thinking=True)
+        # 降级到 MiMo
+        fallback_mimo = getattr(config, 'MIMO_MODEL', 'mimo-v2.5')
+        print(f"   🔄 Gemini 主通道失败，降级到 MiMo 主通道 ({fallback_mimo})...")
+        result = _try_channel(config.MIMO_API_KEY, getattr(config, 'MIMO_API_URL', 'https://token-plan-cn.xiaomimimo.com/v1/chat/completions'), fallback_mimo, "MiMo官方", enable_thinking=True)
         if result: return result
         
     else:
-        # 主通道优先模式 (默认 MiMo/DeepSeek)
-        is_ds_model = "deepseek" in target_model.lower() or "mimo" in target_model.lower() or target_model == config.LLM_MODEL
-        print(f"   🚀 [动态路由] 优先走系统主通道 ({target_model})...")
-        result = _try_channel(config.LLM_API_KEY, config.LLM_API_URL, target_model, "系统主通道", enable_thinking=is_ds_model)
-        if result: return result
+        # 默认路由：MiMo -> DeepSeek -> Gemini -> OpenRouter
+        is_mimo = "mimo" in target_model.lower()
         
-        # 降级到 Gemini
+        # 1. 尝试 MiMo
+        if getattr(config, 'MIMO_API_KEY', None):
+            print(f"   🚀 [动态路由] 优先走 MiMo 主通道 ({target_model})...")
+            result = _try_channel(config.MIMO_API_KEY, getattr(config, 'MIMO_API_URL', 'https://token-plan-cn.xiaomimimo.com/v1/chat/completions'), target_model, "MiMo官方", enable_thinking=is_mimo)
+            if result: return result
+            
+        # 2. 降级到 DeepSeek
+        if getattr(config, 'DEEPSEEK_API_KEY', None):
+            ds_model = getattr(config, 'DEEPSEEK_MODEL', 'deepseek-v4-flash')
+            print(f"   🔄 MiMo 主通道失败，降级到 DeepSeek 备用通道 ({ds_model})...")
+            result = _try_channel(config.DEEPSEEK_API_KEY, getattr(config, 'DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/completions'), ds_model, "DeepSeek官方", enable_thinking=True)
+            if result: return result
+            
+        # 3. 降级到 Gemini
         fallback_gemini = getattr(config, 'GOOGLE_GENAI_MODEL', 'gemini-3.1-flash-lite-preview')
-        print(f"   🔄 主通道失败，降级到 Google GenAI 备用通道 ({fallback_gemini})...")
+        print(f"   🔄 DeepSeek 通道失败，降级到 Google GenAI 备用通道 ({fallback_gemini})...")
         result = _try_google_genai(fallback_gemini, "Google GenAI 官方")
         if result: return result
 
