@@ -18,7 +18,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 # 主通道 (最高优先级): Xiaomi MiMo (支持高并发极速思考)
 LLM_API_KEY = MIMO_API_KEY
 LLM_API_URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
-LLM_MODEL = "mimo-v2.5-pro"
+LLM_MODEL = "mimo-v2.5"
 
 # 兼容模型 Thinking 模式配置 (支持 MiMo / DeepSeek)
 DEEPSEEK_THINKING_ENABLED = True   # 开启思考模式 (思维链推理)
