@@ -32,3 +32,6 @@ n8n_data/
 .cline/
 *.log
 data/
+
+# Test Outputs
+tests/mimo_*_outputs/
