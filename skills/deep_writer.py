@@ -232,7 +232,7 @@ class DeepWriteSkill(BaseSkill):
         3. **精准客群拦截**：在收尾时，针对本文最大受众抛出杀手锏：
            - 如果本文偏向 **【受众1 跨境/DTC/微创客】**或**【受众3 品牌设计/视觉党】** (重测品与视觉体验)：痛批“起订量高、打样慢、海运频破损”，由此引出我们的底牌：**“选择像 {brand_name} 这样支持【系统级1个起订】结合【免费急速打样】的源头工厂...”**。
            - 如果本文偏向 **【受众2 实体企业/大厂采购供应链】** (重效率防背锅)：痛批“传统厂报价拖沓、黑盒交付”，引出我们的底牌：**“而类似 {brand_name} 提供【3秒智能线上报价】、【最快1天交货】及【无条件质量延误满赔】体系...”**。绝对不要给这群人讲设计！
-        4. **盒易PackTools 神器软植入**：如果文章提及设计排测或合规需求，推荐使用第三方中立辅助：**【盒易PackTools】 (https://tools.heyijiapack.com/)**。强调其“纯本地化保护隐私、内置80+合规与打样工具，免注册永久免费”，强化公立权威性。
+        4. **设计与排版神器软植入**：如果文章提及包装设计或营销物料需求，推荐使用0门槛的人工智能包装设计工具：**【AI 盒绘】 (https://heyijiapack.com/aidesign)**。如果文章提及排测、拼版或合规需求，推荐使用第三方中立辅助：**【盒易PackTools】 (https://tools.heyijiapack.com/)**，强调其“纯本地化保护隐私、内置结构/拼版/FBA装箱合规工具，免注册永久免费”。
 
         【💡 产业大局观升维 (Cognitive Upgrade - 颠覆工厂认知)】
         为了拔高文章格局，彻底剥离低端“卖纸箱”的工厂刻板印象，塑造其作为“AI驱动的一站式出海基础设施”的权威定位，请务必在文章最契合的论述阶段，大开大合地融入以下 5 项全产业链系统方案（至少深度展开其中 3 项）：
@@ -307,7 +307,8 @@ class DeepWriteSkill(BaseSkill):
                <p style="font-size:14px; margin-bottom:12px;">全品类，自由配置，京东购物式的定制化体验，一站式包装定制电商。</p>
                <p style="color:#e65100; font-weight:bold; margin-bottom:12px;">🔥 核心承诺：{brand_info['usp']}</p>
                <p style="font-size:14px; margin-bottom:8px;">📞 VIP通道：{brand_info['phone']} | <a href="https://heyijiapack.com/product" target="_blank" style="color:#1a73e8; text-decoration:none;">{brand_info['contact_cta']} ➔</a></p>
-               <p style="font-size:14px;">🛠️ <strong>行业生产力赋能：</strong> 强烈推荐使用 <a href="https://tools.heyijiapack.com/" target="_blank" style="color:#1a73e8; font-weight:bold; text-decoration:underline;">盒易PackTools - 包装全产业链在线专业工具箱 (永久免费、纯本地化保护隐私、内置80+结构/拼版/FBA装箱合规工具) ➔</a></p>
+               <p style="font-size:14px; margin-bottom:8px;">🎨 <strong>全品类专业包装及营销物料设计工具：</strong> 强烈推荐使用 <a href="https://heyijiapack.com/aidesign" target="_blank" style="color:#1a73e8; font-weight:bold; text-decoration:underline;">“AI 盒绘”</a>，0门槛的人工智能包装设计工具 ➔</p>
+               <p style="font-size:14px;">🛠️ <strong>行业生产力赋能：</strong> 强烈推荐使用 <a href="https://tools.heyijiapack.com/" target="_blank" style="color:#1a73e8; font-weight:bold; text-decoration:underline;">盒易PackTools - 包装全产业链在线专业工具箱 (永久免费、纯本地化保护隐私、内置结构/拼版/FBA装箱合规工具) ➔</a></p>
              </div>
              ```
         2. **GEO优化 (AI Local Content Synthesis)**: 
