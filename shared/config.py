@@ -25,7 +25,7 @@ DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL = "deepseek-v4-flash"
 
 # 兼容模型 Thinking 模式配置 (支持 MiMo / DeepSeek)
-LLM_THINKING_ENABLED = True   # 开启思考模式 (思维链推理)
+LLM_THINKING_ENABLED = False   # 开启思考模式 (思维链推理)
 LLM_REASONING_EFFORT = "high" # 思考强度: "high" (默认) 或 "max" (复杂任务)
 
 # 3. 三级备用通道: Google GenAI (当上述通道失败后切换)
