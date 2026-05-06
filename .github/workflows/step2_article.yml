@@ -38,6 +38,7 @@ jobs:
         ARTICLE_CATEGORY: ${{ matrix.category }}
         # 使用国内 DeepSeek 直连 API
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
         GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
