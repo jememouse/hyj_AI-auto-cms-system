@@ -14,10 +14,10 @@ def extract_json(content: str) -> Optional[Dict]:
     """
     从 LLM 响应中提取 JSON (支持多种格式)
 
-    使用三重解析策略:
+    使用更健壮的三重解析策略:
     1. 直接解析整个内容
-    2. 正则匹配最外层 JSON 对象
-    3. 括号深度追踪找出完整 JSON
+    2. 提取 markdown ```json ... ``` 块
+    3. 括号深度追踪，找出所有合法 JSON 块并返回最大最完整的一个 (防止被 <think> 内的无用 JSON 干扰)
 
     Args:
         content: LLM 响应文本
@@ -33,19 +33,22 @@ def extract_json(content: str) -> Optional[Dict]:
 
     # 方法1: 直接解析
     try:
-        return json.loads(content, strict=False)
+        res = json.loads(content, strict=False)
+        if isinstance(res, dict): return res
     except json.JSONDecodeError:
         pass
 
-    # 方法2: 正则匹配最外层 JSON 对象
-    json_match = re.search(r'\{[\s\S]*\}', content)
-    if json_match:
+    # 方法2: 提取 markdown ```json ... ``` 块
+    md_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', content)
+    if md_match:
         try:
-            return json.loads(json_match.group(), strict=False)
+            res = json.loads(md_match.group(1), strict=False)
+            if isinstance(res, dict): return res
         except json.JSONDecodeError:
             pass
 
-    # 方法3: 括号深度追踪
+    # 方法3: 括号深度追踪，找出所有合法的 JSON 块，选择最大的一个
+    valid_jsons = []
     depth, start_idx = 0, -1
     for i, char in enumerate(content):
         if char == '{':
@@ -57,9 +60,16 @@ def extract_json(content: str) -> Optional[Dict]:
             if depth == 0 and start_idx != -1:
                 try:
                     json_str = content[start_idx:i+1]
-                    return json.loads(json_str, strict=False)
+                    parsed = json.loads(json_str, strict=False)
+                    if isinstance(parsed, dict):
+                        valid_jsons.append(parsed)
                 except json.JSONDecodeError:
-                    start_idx = -1
+                    pass
+                start_idx = -1  # Reset to find the next block
+                
+    if valid_jsons:
+        # 启发式：真正的 JSON 通常是最大的那个
+        return max(valid_jsons, key=lambda x: len(str(x)))
 
     return None
 
@@ -110,15 +120,38 @@ def extract_json_array(content: str) -> Optional[list]:
     except json.JSONDecodeError:
         pass
 
-    # 方法2: 正则匹配数组
-    array_match = re.search(r'\[[\s\S]*\]', content)
-    if array_match:
+    # 方法2: 提取 markdown 块
+    md_match = re.search(r'```(?:json)?\s*(\[[\s\S]*?\])\s*```', content)
+    if md_match:
         try:
-            result = json.loads(array_match.group(), strict=False)
+            result = json.loads(md_match.group(1), strict=False)
             if isinstance(result, list):
                 return result
         except json.JSONDecodeError:
             pass
+
+    # 方法3: 括号深度追踪
+    valid_jsons = []
+    depth, start_idx = 0, -1
+    for i, char in enumerate(content):
+        if char == '[':
+            if depth == 0:
+                start_idx = i
+            depth += 1
+        elif char == ']':
+            depth -= 1
+            if depth == 0 and start_idx != -1:
+                try:
+                    json_str = content[start_idx:i+1]
+                    parsed = json.loads(json_str, strict=False)
+                    if isinstance(parsed, list):
+                        valid_jsons.append(parsed)
+                except json.JSONDecodeError:
+                    pass
+                start_idx = -1
+                
+    if valid_jsons:
+        return max(valid_jsons, key=lambda x: len(str(x)))
 
     return None
 
@@ -176,14 +209,18 @@ def call_llm_with_retry(
         }
 
         # Thinking 模式参数注入 (MiMo / DeepSeek 兼容)
-        if enable_thinking and (getattr(config, 'LLM_THINKING_ENABLED', False) or getattr(config, 'DEEPSEEK_THINKING_ENABLED', False)):
-            reasoning_effort = getattr(config, 'LLM_REASONING_EFFORT', getattr(config, 'DEEPSEEK_REASONING_EFFORT', 'high'))
-            payload["thinking"] = {"type": "enabled"}
-            payload["reasoning_effort"] = reasoning_effort
-            # Thinking 模式下需要更大的 max_tokens (包含思维链输出)
-            payload["max_tokens"] = 16384
-            # Thinking 模式下 temperature 参数不生效，但不会报错
-            print(f"   🧠 [Thinking] 已开启思考模式 (effort={reasoning_effort})")
+        if enable_thinking:
+            if getattr(config, 'LLM_THINKING_ENABLED', False) or getattr(config, 'DEEPSEEK_THINKING_ENABLED', False):
+                reasoning_effort = getattr(config, 'LLM_REASONING_EFFORT', getattr(config, 'DEEPSEEK_REASONING_EFFORT', 'high'))
+                payload["thinking"] = {"type": "enabled"}
+                payload["reasoning_effort"] = reasoning_effort
+                # Thinking 模式下需要更大的 max_tokens (包含思维链输出)
+                payload["max_tokens"] = 16384
+                # Thinking 模式下 temperature 参数不生效，但不会报错
+                print(f"   🧠 [Thinking] 已开启思考模式 (effort={reasoning_effort})")
+            else:
+                # 明确关闭思考模式 (防止部分模型如 MiMo 默认开启)
+                payload["thinking"] = {"type": "disabled"}
 
         # Thinking 模式需要更长超时 (思维链输出耗时较长)
         request_timeout = 180 if enable_thinking else 90
