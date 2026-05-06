@@ -205,7 +205,7 @@ def call_llm_with_retry(
             "model": api_model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": 8192
+            "max_tokens": 16384
         }
 
         # Thinking 模式参数注入 (MiMo / DeepSeek 兼容)
@@ -277,7 +277,7 @@ def call_llm_with_retry(
                         contents=prompt_text,
                         config=types.GenerateContentConfig(
                             temperature=temperature,
-                            max_output_tokens=8192
+                            max_output_tokens=16384
                         )
                     )
                     if response and response.text:
