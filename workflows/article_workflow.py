@@ -92,6 +92,45 @@ class ArticleWorkflow(BaseWorkflow):
 
         self.bus.mark_job_status(job.get('record_id'), fields)
 
+    def run(self):
+        print(f"\n{'=' * 50}")
+        print(f"🤖 启动 Workflow (多线程并行模式): {self.name}")
+        print(f"{'=' * 50}\n")
+
+        jobs = self.fetch_jobs()
+        if not jobs:
+            print(f"[{self.name}] 暂无待处理任务，退出。")
+            return
+
+        total = len(jobs)
+        max_workers = int(os.getenv("MAX_WORKERS", "3"))
+        print(f"[{self.name}] 获取到 {total} 个任务，启动 {max_workers} 个线程并发处理...")
+
+        import concurrent.futures
+
+        def process_single_job(idx, job):
+            title_preview = str(job.get('Topic') or job.get('Title') or '')[:30]
+            print(f"\n--- [{idx + 1}/{total}] {title_preview}... ---")
+            try:
+                result = self.process_job(job)
+                if result:
+                    self.on_success(job, result)
+                else:
+                    self.on_failure(job, "无结果")
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self.on_failure(job, e)
+            self._wait()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有任务到线程池
+            futures = [executor.submit(process_single_job, idx, job) for idx, job in enumerate(jobs)]
+            # 等待所有任务完成
+            concurrent.futures.wait(futures)
+
+        print(f"\n[{self.name}] ✅ 所有并行任务处理完成。")
+
     def _wait(self):
         wait_min = config.STEP2_STRATEGY.get("wait_time_min", 2.0)
         wait_max = config.STEP2_STRATEGY.get("wait_time_max", 4.0)

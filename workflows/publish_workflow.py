@@ -71,7 +71,7 @@ class PublishWorkflow(BaseWorkflow):
         print(f"🤖 启动 Workflow: {self.name}")
         print(f"{'=' * 50}\n")
 
-        limit = 20
+        limit = int(os.getenv("MAX_PUBLISH_PER_CATEGORY", "50"))
         # 从环境变量获取当前并发执行的分类（由 Github Actions step3_publish.yml 传入）
         category_filter = os.getenv("PUBLISH_CATEGORY")
         num_accounts = len(self.active_accounts) if self.active_accounts else 1
