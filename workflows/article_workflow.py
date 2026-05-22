@@ -66,9 +66,12 @@ class ArticleWorkflow(BaseWorkflow):
             elif isinstance(final_tags, list):
                 if priority_tag not in final_tags:
                     final_tags.insert(0, priority_tag)
+                final_tags = ", ".join(str(t) for t in final_tags)
             else:
-                if priority_tag not in str(final_tags):
-                    final_tags = f"{priority_tag}, {final_tags}"
+                tags_list = [t.strip() for t in str(final_tags).split(',') if t.strip()]
+                if priority_tag not in tags_list:
+                    tags_list.insert(0, priority_tag)
+                final_tags = ", ".join(tags_list)
 
         fields = {
             "Title": title,

@@ -229,7 +229,7 @@ class StateBus:
 
     def fetch_published_articles(self, limit: int) -> list:
         records = self.client.execute(
-            "SELECT * FROM seo_articles WHERE status = ? LIMIT ?", 
+            "SELECT * FROM seo_articles WHERE status = ? ORDER BY published_at DESC LIMIT ?", 
             [config.STATUS_PUBLISHED, limit]
         ) or []
         return records

@@ -76,6 +76,27 @@ def get_summary() -> str:
     daily = stats["daily"].get(today, {"generated": 0, "published": 0, "failed": 0})
     total = stats["total"]
     
+    # === 新增：从 D1 获取真实发布数量，解决并发统计丢失/多环境缓存隔离问题 ===
+    try:
+        from core.state_bus import StateBus
+        bus = StateBus()
+        today_prefix = today + "%"
+        
+        res_today = bus.client.execute(
+            "SELECT count(*) as cnt FROM seo_articles WHERE status = 'Published' AND published_at LIKE ?", 
+            [today_prefix]
+        )
+        if res_today:
+            daily['published'] = res_today[0].get('cnt', daily['published'])
+            
+        res_total = bus.client.execute(
+            "SELECT count(*) as cnt FROM seo_articles WHERE status = 'Published'"
+        )
+        if res_total:
+            total['published'] = res_total[0].get('cnt', total['published'])
+    except Exception as e:
+        print(f"⚠️ [Stats] 无法从 D1 获取实时发布数据: {e}")
+    
     return f"""📊 **数据统计**
 **今日 ({today})**
 - 生成: {daily['generated']} 篇

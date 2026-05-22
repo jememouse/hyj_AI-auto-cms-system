@@ -162,10 +162,10 @@ class PublishWorkflow(BaseWorkflow):
                             pass
                     
                     summary_val = str(record.get('摘要', ''))
-                    if summary_val == 'None':
+                    if not summary_val or summary_val.lower() in ('none', 'null'):
                         summary_val = ''
                     one_line = str(record.get('One_Line_Summary', ''))
-                    if one_line == 'None':
+                    if not one_line or one_line.lower() in ('none', 'null'):
                         one_line = ''
                         
                     # 优先使用 One_Line_Summary 作为 brief，以防摘要被大模型充当成 "SEO Description..." 等无意义占位符
@@ -185,9 +185,18 @@ class PublishWorkflow(BaseWorkflow):
                         "tags": parsed_tags
                     }
 
+                    published_url = None
                     try:
                         published_url = agent.publish_in_session(article_data)
+                    except Exception as e:
+                        print(f"   ⚠️ [Session] 发布可能因会话失效而报错: {e}，尝试重新建立会话...")
+                        try:
+                            if agent.open_session():
+                                published_url = agent.publish_in_session(article_data)
+                        except Exception as e2:
+                            print(f"   ❌ [Error] 重新建立会话后发布依旧异常: {e2}")
 
+                    try:
                         if published_url:
                             self.bus.mark_as_published(record['record_id'], article_data, published_url)
                             total_success += 1
@@ -199,7 +208,7 @@ class PublishWorkflow(BaseWorkflow):
                     except Exception as e:
                         total_fail += 1
                         stats.record_failed()
-                        print(f"   ❌ [Error] 发布异常: {e}")
+                        print(f"   ❌ [Error] 状态更新异常: {e}")
                         import traceback
                         traceback.print_exc()
 

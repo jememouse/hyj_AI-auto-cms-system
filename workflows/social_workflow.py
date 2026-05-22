@@ -43,9 +43,13 @@ class SocialWorkflow(BaseWorkflow):
         article_content = job.get("HTML_Content", "")
         if not article_content or len(article_content) < 100:
             return None
+            
+        import re
+        clean_content = re.sub(r'<[^>]+>', '', article_content)
+        
         return self.agent.create_social_post(
             job.get("Title", "无标题"),
-            article_content,
+            clean_content,
             self._current_platform
         )
 
@@ -109,8 +113,22 @@ class SocialWorkflow(BaseWorkflow):
                 continue
 
             self._current_platform = p_key
-            pool = list(source_records)
-            random.shuffle(pool)
+            
+            # 使用加权随机抽取，优先最新发布的文章
+            pool_source = list(source_records)
+            weights = [max(1, len(pool_source) - i) for i in range(len(pool_source))]
+            
+            pool = []
+            if pool_source:
+                # 按照权重抽取足够数量（有放回，去重）
+                sampled_raw = random.choices(pool_source, weights=weights, k=len(pool_source)*3)
+                seen = set()
+                for item in sampled_raw:
+                    item_id = item.get("id") or item.get("record_id") or str(item)
+                    if item_id not in seen:
+                        seen.add(item_id)
+                        pool.append(item)
+            
             success_count = 0
 
             for record in pool:

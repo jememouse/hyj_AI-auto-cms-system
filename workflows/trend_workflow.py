@@ -39,9 +39,18 @@ class TrendWorkflow(BaseWorkflow):
         
         # 2. 对账与清算逻辑
         tracker_file = os.path.join(BASE_DIR, "data", "pending_seeds.json")
+        processing_file = tracker_file + ".processing"
+        
         if os.path.exists(tracker_file):
             try:
-                with open(tracker_file, 'r', encoding='utf-8') as f:
+                # 原子操作防并发
+                os.rename(tracker_file, processing_file)
+            except OSError:
+                print("⚠️ [Reconcile] 无法获取种子词追踪文件锁，可能已被其他进程处理。")
+                return
+                
+            try:
+                with open(processing_file, 'r', encoding='utf-8') as f:
                     pending_data = json.load(f)
                 
                 orphans = pending_data.get("pending_records", [])
@@ -63,8 +72,8 @@ class TrendWorkflow(BaseWorkflow):
                         rollback_count = 0
                         for orphan in orphans:
                             kw = orphan.get("keyword", "")
-                            # 如果该词没有在任何一个成功生成的话题的 Source_Trend 里被映射到，说明被大模型丢弃或发生超时漏词
-                            if kw and kw not in consumed_kws:
+                            # 模糊匹配容错：允许大模型输出带有修饰词
+                            if kw and not any((kw in c or c in kw) for c in consumed_kws):
                                 rec_id = orphan.get("record_id")
                                 if rec_id:
                                     client.update_record(rec_id, {"Status": "Unused"}, table_id="keywords_lib")
@@ -77,15 +86,22 @@ class TrendWorkflow(BaseWorkflow):
             except Exception as e:
                 print(f"❌ [Reconcile] 对账异常: {e}")
             finally:
-                if os.path.exists(tracker_file):
-                    os.remove(tracker_file)
+                if os.path.exists(processing_file):
+                    os.remove(processing_file)
 
     def on_failure(self, job: dict, error):
         # 覆写失败机制，遇到全盘崩溃时全量回拨
         tracker_file = os.path.join(BASE_DIR, "data", "pending_seeds.json")
+        processing_file = tracker_file + ".processing"
+        
         if os.path.exists(tracker_file):
             try:
-                with open(tracker_file, 'r', encoding='utf-8') as f:
+                os.rename(tracker_file, processing_file)
+            except OSError:
+                return
+                
+            try:
+                with open(processing_file, 'r', encoding='utf-8') as f:
                     pending_data = json.load(f)
                 
                 orphans = pending_data.get("pending_records", [])
@@ -102,7 +118,7 @@ class TrendWorkflow(BaseWorkflow):
             except Exception as e:
                 print(f"❌ [Reconcile] 回滚异常: {e}")
             finally:
-                if os.path.exists(tracker_file):
-                    os.remove(tracker_file)
+                if os.path.exists(processing_file):
+                    os.remove(processing_file)
 
         super().on_failure(job, error)
