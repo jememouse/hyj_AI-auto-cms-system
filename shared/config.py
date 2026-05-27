@@ -156,9 +156,9 @@ STATUS_PUBLISHED = "Published" # 节点3完成: 已发布
 
 # 核心业务策略配置
 STEP2_STRATEGY = {
-    "max_generate_total": 80,  # 优化：每次上限 80 篇，约耗时 50 分钟，确保在 GitHub 60 分钟限时内优雅结束并标记绿✅
-    "wait_time_min": 2.0,      # 生成后最少等待时间(秒)，保留以防止大模型 API 封禁
-    "wait_time_max": 4.0       # 生成后最大等待时间(秒)
+    "max_generate_total": 9999,  # 极致狂飙模式：无限续杯，不写空队列绝不罢休
+    "wait_time_min": 1.5,      # 生成后最少等待时间(秒)，极限压缩
+    "wait_time_max": 2.5       # 生成后最大等待时间(秒)，极限压缩
 }
 
 # 每分类最大处理数量

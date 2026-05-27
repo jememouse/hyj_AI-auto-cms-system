@@ -12,7 +12,7 @@ env:
 jobs:
   step2-article:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 350
     strategy:
       matrix:
         category: ["专业知识", "行业资讯", "产品介绍"]
