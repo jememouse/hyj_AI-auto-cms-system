@@ -188,15 +188,15 @@ def run(config_file: str = None):
 
                 # 发布每篇文章
                 for idx, record in enumerate(records):
-                    title = record.get("title") or record.get("topic", "")
+                    title = record.get("Title") or record.get("Topic", "")
                     
                     print(f"\n   [{idx + 1}/{len(records)}] {title[:30]}...")
                 
                 # 准备文章数据
-                    html_content = record.get("html_content", "")
+                    html_content = record.get("HTML_Content", "")
                     
                     # === Schema 结构化数据注入 ===
-                    schema_faq_raw = record.get("schema_faq", "")
+                    schema_faq_raw = record.get("Schema_FAQ", "")
                     schema_faq = []
                     
                     # 1. FAQ Schema (可配置开关)
@@ -257,8 +257,8 @@ def run(config_file: str = None):
                             },
                             "datePublished": datetime.now().strftime("%Y-%m-%d"),
                             "dateModified": datetime.now().strftime("%Y-%m-%d"),
-                            "description": record.get("description", "")[:160],
-                            "keywords": record.get("keywords", "")
+                            "description": record.get("描述", "")[:160],
+                            "keywords": record.get("关键词", "")
                         }
                         article_schema_script = f'<script type="application/ld+json">{json.dumps(article_schema, ensure_ascii=False)}</script>'
                         html_content = html_content + "\n" + article_schema_script
@@ -282,15 +282,15 @@ def run(config_file: str = None):
                         quality_score -= 5
                     
                     # 2. 必填字段检测
-                    if not record.get("keywords"):
+                    if not record.get("关键词"):
                         quality_issues.append("缺少关键词")
                         quality_score -= 15
-                    if not record.get("description"):
+                    if not record.get("描述"):
                         quality_issues.append("缺少描述")
                         quality_score -= 10
                     
                     # 3. 关键词密度检测
-                    keywords_str = record.get("keywords", "")
+                    keywords_str = record.get("关键词", "")
                     if keywords_str:
                         keywords_list = [kw.strip() for kw in keywords_str.replace("，", ",").split(",") if kw.strip()]
                         keyword_counts = {}
@@ -315,10 +315,10 @@ def run(config_file: str = None):
                         "title": title,
                         "html_content": html_content,
                         "category_id": config.CATEGORY_MAP.get(category, "2"),
-                        "summary": record.get("summary", ""),
-                        "keywords": record.get("keywords", ""),
-                        "description": record.get("description", ""),
-                        "tags": record.get("tags", ""),
+                        "summary": record.get("摘要", ""),
+                        "keywords": record.get("关键词", ""),
+                        "description": record.get("描述", ""),
+                        "tags": record.get("Tags", ""),
                     }
                     
                     # RPA 发布 (复用已建立的会话，无需重新登录)

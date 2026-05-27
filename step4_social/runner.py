@@ -84,10 +84,10 @@ def run():
 
         # 检查状态: 只处理未完成的 (Empty or Ready)
         # 如果是 Done，跳过
-        xhs_status = record.get("xhs_status", "")
+        xhs_status = record.get("XHS_Status", "")
         if xhs_status == "Done":
              # debug print optionally
-             # print(f"   ⏩ 跳过已处理文章: {record.get('title')}")
+             # print(f"   ⏩ 跳过已处理文章: {record.get('Title')}")
              continue
         
         # 默认只处理 "Ready" (人工触发) 
@@ -96,9 +96,9 @@ def run():
         # 所以逻辑是: Published AND Status!=Done -> Go
         pass
 
-        topic = record.get("topic", "")
-        article_title = record.get("title", topic)
-        article_content = record.get("html_content", "")
+        topic = record.get("Topic", "")
+        article_title = record.get("Title", topic)
+        article_content = record.get("HTML_Content", "")
         
         if not article_content:
             continue
