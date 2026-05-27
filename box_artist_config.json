@@ -305,7 +305,7 @@
     ]
   },
   "trend_settings": {
-    "max_trends_to_analyze": 25,
+    "max_trends_to_analyze": 150,
     "titles_per_trend": 3
   },
   "deepseek_prompt": {

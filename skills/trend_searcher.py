@@ -71,7 +71,7 @@ class TrendSearchSkill(BaseSkill):
                             os.remove(tracker_file)
                 # -------------------------------------------------------------
 
-                pull_limit = 20
+                pull_limit = 150
                 
                 # 兼容两种状态：留空 ("") 或者填了 "Unused"，并开启 reverse_batch=True 实现“先进后出”(LIFO) 优先抽取最新添加的词库
                 unused_records = client.fetch_records_by_status("", limit=pull_limit, table_id="keywords_lib", reverse_batch=True)
