@@ -36,12 +36,19 @@ class TopicAnalysisSkill(BaseSkill):
         results = []
         generated_texts = [] # 用于去重检查
 
-        # 2. 第二步：批量为所有热点生成标题 (Batching)
-        print(f"   🧠 [Analyst] 启动大模型批处理，为 {len(analyzed_trends)} 个热点一次性生成标题...")
-        titles_batch = self._generate_titles_batch(analyzed_trends, input_data.get("config", {}))
+        # 2. 第二步：批量为所有热点生成标题 (Batching，引入分块机制防止大模型 Output Token 溢出)
+        print(f"   🧠 [Analyst] 启动大模型分块批处理，为 {len(analyzed_trends)} 个热点生成标题...")
+        titles_batch = []
+        batch_size = 20
+        for i in range(0, len(analyzed_trends), batch_size):
+            chunk = analyzed_trends[i:i + batch_size]
+            print(f"      - 正在处理批次: 第 {i+1} ~ {i+len(chunk)} 个热点...")
+            chunk_results = self._generate_titles_batch(chunk, input_data.get("config", {}))
+            if chunk_results:
+                titles_batch.extend(chunk_results)
         
         if not titles_batch:
-             print("   ❌ [Analyst] 批量生成标题失败，LLM未返回有效数据")
+             print("   ❌ [Analyst] 批量生成标题失败，所有批次 LLM 均未返回有效数据")
              return []
 
         for t in titles_batch:
