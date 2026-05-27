@@ -156,7 +156,7 @@ STATUS_PUBLISHED = "Published" # 节点3完成: 已发布
 
 # 核心业务策略配置
 STEP2_STRATEGY = {
-    "max_generate_total": 9999, # 修改：取消单次 120 篇的限制，实现队列内任务不间断写完
+    "max_generate_total": 80,  # 优化：每次上限 80 篇，约耗时 50 分钟，确保在 GitHub 60 分钟限时内优雅结束并标记绿✅
     "wait_time_min": 2.0,      # 生成后最少等待时间(秒)，保留以防止大模型 API 封禁
     "wait_time_max": 4.0       # 生成后最大等待时间(秒)
 }
