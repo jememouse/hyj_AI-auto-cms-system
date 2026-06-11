@@ -10,50 +10,55 @@ import sys
 import os
 import json
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # 动态添加项目根目录到 sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 from shared.google_client import GoogleSheetClient
+from shared.d1_client import D1Client
 from shared import config
 
 def generate_daily_report():
     print("📊 开始生成每日发布数据统计报告...")
     
     client = GoogleSheetClient()
-    assets_file = os.path.join(PROJECT_ROOT, "published_assets.json")
+    db = D1Client()
     
     counts = defaultdict(int)
     total_published = 0
     
-    if os.path.exists(assets_file):
-        try:
-            with open(assets_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                for item in data:
-                    date_str = item.get("published_at", "")[:10]
-                    if date_str:
-                        counts[date_str] += 1
-                        total_published += 1
-        except Exception as e:
-            print(f"⚠️ 读取 published_assets.json 失败: {e}")
-            return
-    else:
-        print(f"⚠️ 未找到文件: {assets_file}")
+    try:
+        # 获取历史累计总发布
+        res_total = db.execute("SELECT COUNT(*) as c FROM seo_articles WHERE status = 'Published'")
+        if res_total:
+            total_published = res_total[0].get('c', 0)
+            
+        # 获取按天统计的发布数据
+        res_counts = db.execute("SELECT substr(published_at, 1, 10) as d, COUNT(*) as c FROM seo_articles WHERE status = 'Published' AND published_at IS NOT NULL GROUP BY substr(published_at, 1, 10)")
+        if res_counts:
+            for row in res_counts:
+                d = row.get('d')
+                if d:
+                    counts[d] += row.get('c', 0)
+    except Exception as e:
+        print(f"⚠️ 读取 D1 数据库失败: {e}")
         return
         
+    # 强制使用北京时间 (UTC+8) 避免服务器环境时区干扰
+    tz_bj = timezone(timedelta(hours=8))
+    now = datetime.now(tz_bj)
+    
     # 获取今天和昨天的日期
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    today_str = now.strftime("%Y-%m-%d")
+    yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
     
     today_count = counts.get(today_str, 0)
     yesterday_count = counts.get(yesterday_str, 0)
     
-    # 按照日期降序提取最近 7 天的记录
-    sorted_dates = sorted(counts.keys(), reverse=True)
-    recent_7_days = sorted_dates[:7]
+    # 按照自然日历生成最近 7 天的日期列表（倒序：从今天往前推 6 天）
+    recent_7_days = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
     
     # 构建飞书消息内容
     lines = [
@@ -67,7 +72,7 @@ def generate_daily_report():
     ]
     
     for d in recent_7_days:
-        lines.append(f" - {d}: {counts[d]} 篇")
+        lines.append(f" - {d}: {counts.get(d, 0)} 篇")
         
     lines.append("")
     lines.append("🤖 *本条消息由 AI-Auto-CMS 自动化系统每日定时发送*")
