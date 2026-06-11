@@ -28,13 +28,12 @@ jobs:
 
     - name: Run Backup Script
       env:
-        # Google Sheets Config
-        GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-        GOOGLE_SHEET_BACKUP_ID: ${{ secrets.GOOGLE_SHEET_BACKUP_ID }}
+        # Google Apps Script API URL
+        GOOGLE_APPS_SCRIPT_URL: ${{ secrets.GOOGLE_APPS_SCRIPT_URL }}
         # Cloudflare D1 Config
         CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         CF_D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
         CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         TZ: 'Asia/Shanghai'
       run: |
-        uv run python scripts/backup_d1_to_sheet.py
+        uv run python scripts/backup_d1_to_drive.py
