@@ -69,7 +69,7 @@ def backup():
 
     # 3. 通过 Base64 编码数据以确保 JSON 传输安全
     print("\n>>> Step 3: 通过 Google Apps Script 投递文件到云盘...")
-    filename = f"cms_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"cms_backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_共{len(records)}条.csv"
     encoded_csv = base64.b64encode(csv_data.encode('utf-8')).decode('utf-8')
     
     payload = {
