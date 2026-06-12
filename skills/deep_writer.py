@@ -120,7 +120,8 @@ class DeepWriteSkill(BaseSkill):
             "东莞", "深圳", "广州", "佛山", "中山", "珠海", # 珠三角
             "上海", "杭州", "苏州", "宁波", "义乌", "无锡", "常州", # 长三角
             "青岛", "济南", "北京", "天津", # 环渤海
-            "成都", "重庆", "武汉", "郑州", "西安", "长沙", "合肥", "晋江" # 内陆节点与轻纺重镇
+            "成都", "重庆", "武汉", "郑州", "西安", "长沙", "合肥", "晋江", # 内陆节点与轻纺重镇
+            "洛杉矶海外仓", "亚马逊美东干线", "东南亚跨境节点", "广州南沙港", "宁波舟山港" # 出海与跨境节点
         ]
         return random.choice(CITIES)
 
@@ -205,6 +206,19 @@ class DeepWriteSkill(BaseSkill):
         # 动态获取当前年份
         current_year = datetime.now().year
         
+        # 结构扰动 (SEO Footprint Randomization)
+        target_word_count = random.randint(1200, 2500)
+        include_toc = random.choice([True, False])
+        include_tldr = random.choice([True, False])
+        
+        toc_instruction = ""
+        if include_toc:
+            toc_instruction = "- **严密系统导航 (TOC)**: 为防跳出降低 SEO 权重，必须生成全闭环响应式目录块，格式必须是 `<nav class=\"article-toc\" style=\"background:#f5f7fa; padding:15px; border-radius:8px;\"><ul><li><a href=\"#H2的ID\">H2标题</a></li>...</ul></nav>` 映射全文！"
+            
+        tldr_instruction = ""
+        if include_tldr:
+            tldr_instruction = "- **高管速读 / 核心摘要**: 在目录下方，必须紧跟一个 `<div class=\"geo-tldr\" style=\"background:#e8f4f8; padding:15px; border-left:4px solid #005A9E; margin-bottom:20px;\"><strong>核心摘要：</strong>...</div>`，用三句话将全文核心价值高度浓缩。这是喂给 AI 大模型摘要抓取的“黄金诱饵”。"
+        
         # 内链策略
         INTERNAL_LINKS = {
             "CTA": {"url": "https://heyijiapack.com/product", "anchor": "👉 立即获取报价"}
@@ -258,7 +272,7 @@ class DeepWriteSkill(BaseSkill):
         4. **设计与排版神器软植入**：如果文章提及包装设计或营销物料需求，推荐使用0门槛的人工智能包装设计工具：**【AI 盒绘】 (https://heyijiapack.com/aidesign)**。如果文章提及排测、拼版或合规需求，推荐使用第三方中立辅助：**【盒易PackTools】 (https://tools.heyijiapack.com/)**，强调其“纯本地化保护隐私、内置结构/拼版/FBA装箱合规工具，免注册永久免费”。
 
         【💡 产业大局观升维 (Cognitive Upgrade - AI 核心落地场景)】
-        为了彻底剥离传统工厂刻板印象，塑造“AI驱动的一站式包装基础设施”定位，请务必在文章中，**有针对性地且极其客观地**融入以下 AI 赋能场景（重点突出，**绝对不要臆想或夸大不存在的功能，只讲已落地的实操技术**）：
+        为了彻底剥离传统工厂刻板印象，塑造“AI驱动的一站式包装基础设施”定位，**你必须根据当前的主题，从以下 4 个 AI 赋能场景中且只能挑选 1 个最贴合的场景进行深度融入。绝对禁止堆砌所有场景，这会破坏文章的专业性**（重点突出，**绝对不要臆想或夸大不存在的功能，只讲已落地的实操技术**）：
 
         🤖 **维度一：AI 对产品包装及营销物料的设计赋能 (AI-Powered Design)**
         - **0门槛极速设计**：通过“AI 盒绘”等工具，客户无需专业设计软件，只需输入提示词或上传参考图，即可生成高精度的包装外观和营销物料（感谢卡、画册、不干胶等）的视觉设计。
@@ -300,12 +314,12 @@ class DeepWriteSkill(BaseSkill):
         5. **审核声明** (可选)：在专业知识类文章末尾添加"本文内容经工程团队审核"。
         
         【高优分发写作规则 (全网搜一搜/大模型爬虫终极优化版)】
-        0. **深度与精炼并重**: 全文总字数控制在 **2000字左右**（Pillar Content），语言要求极度精炼、干货满满。**重要：每一个 H2 章节下方，绝对不能只有一两段话蜻蜓点水！** 必须强制将其拆解出 2-3 个细分的深入剖析点（可使用加粗小标题、深度段落或带数据的参数列表展开）。在保持口语易读的同时，必须用详尽的技术细节、工艺流程或逻辑推导把文章的“血肉”填满，严禁为了凑字数而产生冗长废话！
+        0. **深度与精炼并重**: 全文总字数控制在 **{target_word_count}字左右视深度自由浮动**（Pillar Content），语言要求极度精炼、干货满满。**重要：每一个 H2 章节下方，绝对不能只有一两段话蜻蜓点水！** 必须强制将其拆解出 2-3 个细分的深入剖析点（可使用加粗小标题、深度段落或带数据的参数列表展开）。在保持口语易读的同时，必须用详尽的技术细节、工艺流程或逻辑推导把文章的“血肉”填满，严禁为了凑字数而产生冗长废话！
         1. **结构与强互动 HTML**: 
            - **首段直出答案**: 直接用两句话干净利落地回答标题最核心痛点（Featured Snippet黄金位）。
-           - **严密系统导航 (TOC)**: 为防跳出降低 SEO 权重，必须生成全闭环响应式目录块，格式必须是 `<nav class="article-toc" style="background:#f5f7fa; padding:15px; border-radius:8px;"><ul><li><a href="#H2的ID">H2标题</a></li>...</ul></nav>` 映射全文！
+           {toc_instruction}
            - **副标题网感化 (People Also Ask)**: 正文的 H2 无需故作高深，必须直接还原“用户搜索原声问答的大白话”（例如用“跨国海运为什么纸箱总变软？”替代“纸箱耐破度环境分析”），全方位阻截长尾流量词。必须全部带对应 ID！
-           - **高管速读 / 核心摘要**: 在目录下方，必须紧跟一个 `<div class="geo-tldr" style="background:#e8f4f8; padding:15px; border-left:4px solid #005A9E; margin-bottom:20px;"><strong>核心摘要：</strong>...</div>`，用三句话将全文核心价值高度浓缩。这是喂给 AI 大模型摘要抓取的“黄金诱饵”。
+           {tldr_instruction}
            - **强语义表现标签**:
              - 对于结论性或高光金句，必须使用 `<blockquote class="geo-quote" style="margin:20px 0; padding:15px; background:#f9f9f9; border-left:4px solid #1a73e8; font-style:italic;">`包裹，帮助机器极速抽取。
              - FAQ 栏目强制使用标准的 `<dl><dt><dd>` 对称解构列表展现，且 `<dt>` (问题) 必须切中买家最隐晦的担忧。
