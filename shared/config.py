@@ -156,7 +156,7 @@ STATUS_PUBLISHED = "Published" # 节点3完成: 已发布
 
 # 核心业务策略配置
 STEP2_STRATEGY = {
-    "max_generate_total": 9999,  # 极致狂飙模式：无限续杯，不写空队列绝不罢休
+    "max_generate_total": 120,   # 单次最大处理数量回调至安全区间(原9999)
     "wait_time_min": 1.5,      # 生成后最少等待时间(秒)，极限压缩
     "wait_time_max": 2.5       # 生成后最大等待时间(秒)，极限压缩
 }
