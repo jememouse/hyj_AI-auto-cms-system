@@ -86,7 +86,30 @@ class DeepWriteSkill(BaseSkill):
             source_trend=source_trend
         )
 
-        return llm_utils.call_llm_json(prompt, model=config.ARTICLE_MODEL, temperature=0.85, max_retries=2)
+        result_dict = llm_utils.call_llm_json(prompt, model=config.ARTICLE_MODEL, temperature=0.85, max_retries=2)
+        
+        # 将静态品牌签名强制追加到文章末尾，减少 Token 消耗与大模型渲染压力
+        if result_dict and isinstance(result_dict, dict) and "html_content" in result_dict:
+            brand_info_local = {
+                "slogan": "盒艺家，让每个好产品都有好包装",
+                "usp": "3秒智能报价 · 1个起订 · 最快1天交付 · 免费打样 · 时效及质量问题无条件退款",
+                "phone": "177-2795-6114",
+                "contact_cta": "免费获取智能报价"
+            }
+            signature_html = f"""
+             <div class="brand-signature" style="margin-top:30px; padding:20px; background-color:#fef9f5; border-left:4px solid #ff6600; border-radius:4px;">
+               <p style="font-size:16px; margin-bottom:8px;"><strong>{brand_info_local['slogan']}</strong></p>
+               <p style="font-size:14px; margin-bottom:4px;">盒艺家网站：<a href="https://heyijiapack.com/product" target="_blank" style="color:#1a73e8; text-decoration:underline;">https://heyijiapack.com/product</a></p>
+               <p style="font-size:14px; margin-bottom:12px;">全品类，自由配置，京东购物式的定制化体验，一站式包装定制电商。</p>
+               <p style="color:#e65100; font-weight:bold; margin-bottom:12px;">🔥 核心承诺：{brand_info_local['usp']}</p>
+               <p style="font-size:14px; margin-bottom:8px;">📞 VIP通道：{brand_info_local['phone']} | <a href="https://heyijiapack.com/product" target="_blank" style="color:#1a73e8; text-decoration:none;">{brand_info_local['contact_cta']} ➔</a></p>
+               <p style="font-size:14px; margin-bottom:8px;">🎨 <strong>全品类专业包装及营销物料设计工具：</strong> 强烈推荐使用 <a href="https://heyijiapack.com/aidesign" target="_blank" style="color:#1a73e8; font-weight:bold; text-decoration:underline;">“AI 盒绘”</a>，0门槛的人工智能包装设计工具 ➔</p>
+               <p style="font-size:14px;">🛠️ <strong>行业生产力赋能：</strong> 强烈推荐使用 <a href="https://tools.heyijiapack.com/" target="_blank" style="color:#1a73e8; font-weight:bold; text-decoration:underline;">盒易PackTools - 包装全产业链在线专业工具箱 (永久免费、纯本地化保护隐私、内置结构/拼版/FBA装箱合规工具) ➔</a></p>
+             </div>
+            """
+            result_dict["html_content"] = result_dict["html_content"] + signature_html
+            
+        return result_dict
 
     def _get_geo_strategy(self):
         """
@@ -287,18 +310,6 @@ class DeepWriteSkill(BaseSkill):
              - 对于结论性或高光金句，必须使用 `<blockquote class="geo-quote" style="margin:20px 0; padding:15px; background:#f9f9f9; border-left:4px solid #1a73e8; font-style:italic;">`包裹，帮助机器极速抽取。
              - FAQ 栏目强制使用标准的 `<dl><dt><dd>` 对称解构列表展现，且 `<dt>` (问题) 必须切中买家最隐晦的担忧。
            - **JSON-LD 结构化数据强制注入**: 在整篇文章源码的最后，必须直接在 HTML 中输出一段标准的 `<script type="application/ld+json">`，包含 FAQPage 结构（把文章里的 FAQ 转为 JSON-LD 格式）。这能让搜索引擎蜘蛛 100% 秒懂页面结构。
-           - **品牌签名** (销售增强版):
-             ```html
-             <div class="brand-signature" style="margin-top:30px; padding:20px; background-color:#fef9f5; border-left:4px solid #ff6600; border-radius:4px;">
-               <p style="font-size:16px; margin-bottom:8px;"><strong>{brand_info['slogan']}</strong></p>
-               <p style="font-size:14px; margin-bottom:4px;">盒艺家网站：<a href="https://heyijiapack.com/product" target="_blank" style="color:#1a73e8; text-decoration:underline;">https://heyijiapack.com/product</a></p>
-               <p style="font-size:14px; margin-bottom:12px;">全品类，自由配置，京东购物式的定制化体验，一站式包装定制电商。</p>
-               <p style="color:#e65100; font-weight:bold; margin-bottom:12px;">🔥 核心承诺：{brand_info['usp']}</p>
-               <p style="font-size:14px; margin-bottom:8px;">📞 VIP通道：{brand_info['phone']} | <a href="https://heyijiapack.com/product" target="_blank" style="color:#1a73e8; text-decoration:none;">{brand_info['contact_cta']} ➔</a></p>
-               <p style="font-size:14px; margin-bottom:8px;">🎨 <strong>全品类专业包装及营销物料设计工具：</strong> 强烈推荐使用 <a href="https://heyijiapack.com/aidesign" target="_blank" style="color:#1a73e8; font-weight:bold; text-decoration:underline;">“AI 盒绘”</a>，0门槛的人工智能包装设计工具 ➔</p>
-               <p style="font-size:14px;">🛠️ <strong>行业生产力赋能：</strong> 强烈推荐使用 <a href="https://tools.heyijiapack.com/" target="_blank" style="color:#1a73e8; font-weight:bold; text-decoration:underline;">盒易PackTools - 包装全产业链在线专业工具箱 (永久免费、纯本地化保护隐私、内置结构/拼版/FBA装箱合规工具) ➔</a></p>
-             </div>
-             ```
         2. **GEO优化 (AI Local Content Synthesis)**: 
            - **本地化产业植入**: {geo_must_include} 请你运用常识世界观，**自行推断并匹配** **{selected_city}** 当地最繁荣核心的优势产业带（例如深圳3C/电商、郑州食品冷链、东莞模具快消等）。结合你判定的产业特点，输出 1~2 处该地域企业真实面临的包装采购案例。
            - **自动编织物流履约网**: 在文末服务保障中段落，请你根据地理学常识动态生成一句话，说明我们作为工厂对 **{selected_city}** 的交付投送能力（如果在珠三角可渲染“同城当日达/面对面验厂”，如果在内陆远端则可渲染“大型直通物流专线/安全无损”）。全自动、超然且真实。
