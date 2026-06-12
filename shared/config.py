@@ -11,7 +11,8 @@ load_dotenv()
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # LLM API 配置 (Xiaomi MiMo 最高优先级 → DeepSeek 备用 → Google GenAI 备用 → OpenRouter 兜底)
-MIMO_API_KEY = os.getenv("MIMO_API_KEY", "").strip()
+# MIMO_API_KEY = os.getenv("MIMO_API_KEY", "").strip()
+MIMO_API_KEY = ""
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 
@@ -33,8 +34,8 @@ GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY", "").strip()
 GOOGLE_GENAI_MODEL = "gemini-3.1-flash-lite"
 
 # 业务解耦模型设置 (可被环境变量覆写)
-TITLE_MODEL = os.getenv("TITLE_MODEL", MIMO_MODEL)             
-ARTICLE_MODEL = os.getenv("ARTICLE_MODEL", MIMO_MODEL)           
+TITLE_MODEL = os.getenv("TITLE_MODEL", DEEPSEEK_MODEL)             
+ARTICLE_MODEL = os.getenv("ARTICLE_MODEL", DEEPSEEK_MODEL)           
 
 # 4. 四级兜底通道: OpenRouter (所有通道失败后最终兜底)
 FALLBACK_API_KEY = OPENROUTER_API_KEY

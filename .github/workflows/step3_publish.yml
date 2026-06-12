@@ -41,7 +41,7 @@ jobs:
         MAX_PUBLISH_TOTAL: "50"
         MAX_PUBLISH_PER_CATEGORY: "50"
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+        # MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
         GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
