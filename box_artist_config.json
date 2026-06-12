@@ -305,8 +305,8 @@
     ]
   },
   "trend_settings": {
-    "max_trends_to_analyze": 150,
-    "titles_per_trend": 3
+    "max_trends_to_analyze": 30,
+    "titles_per_trend": 4
   },
   "deepseek_prompt": {
     "trend_analysis": "你是一个包装行业专家。请分析以下百度热搜话题，判断哪些话题可以蹭热点来撰写关于'包装印刷、礼盒定制、品牌包装'的文章。如果话题无关，请忽略。请返回JSON格式。",

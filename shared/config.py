@@ -162,7 +162,7 @@ STEP2_STRATEGY = {
 }
 
 # 每分类最大处理数量
-MAX_PUBLISH_PER_CATEGORY = int(os.getenv("MAX_PUBLISH_PER_CATEGORY", "2"))      # 节点3: RPA 发布
+MAX_PUBLISH_PER_CATEGORY = int(os.getenv("MAX_PUBLISH_PER_CATEGORY", "50"))      # 节点3: RPA 发布
 
 # 发布配置文件路径
 PUBLISH_CONFIG_FILE = os.path.join(PROJECT_ROOT, "publish_config.json")
