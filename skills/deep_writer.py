@@ -207,7 +207,7 @@ class DeepWriteSkill(BaseSkill):
         current_year = datetime.now().year
         
         # 结构扰动 (SEO Footprint Randomization)
-        target_word_count = random.randint(1200, 2500)
+        target_word_count = random.randint(800, 1500)
         include_toc = random.choice([True, False])
         include_tldr = random.choice([True, False])
         
@@ -314,7 +314,8 @@ class DeepWriteSkill(BaseSkill):
         5. **审核声明** (可选)：在专业知识类文章末尾添加"本文内容经工程团队审核"。
         
         【高优分发写作规则 (全网搜一搜/大模型爬虫终极优化版)】
-        0. **深度与精炼并重**: 全文总字数控制在 **{target_word_count}字左右视深度自由浮动**（Pillar Content），语言要求极度精炼、干货满满。**重要：每一个 H2 章节下方，绝对不能只有一两段话蜻蜓点水！** 必须强制将其拆解出 2-3 个细分的深入剖析点（可使用加粗小标题、深度段落或带数据的参数列表展开）。在保持口语易读的同时，必须用详尽的技术细节、工艺流程或逻辑推导把文章的“血肉”填满，严禁为了凑字数而产生冗长废话！
+        0. **极简与高信息密度约束 (Anti-Fluff Protocol)**: 全文总字数大幅精简至 **{target_word_count}字左右**。严禁使用"众所周知"、"随着社会的发展"、"最后"等任何过渡套话和冗长的散文式铺垫。开门见山直击痛点，每一段话必须至少包含一个实体（工艺名称、真实数据、专有名词），如果一句话没有实质信息，请直接删除！
+        0.5. **高维结构替代散文 (GEO 杀手锏)**: 能用【对比表格】说明的，绝不用段落文字；能用【带数据的项目符号（ul/li）】罗列的，绝不写成长篇大段。**强制在文章中包含至少一个 `<table>` 元素**用于工艺或成本对比，并且尽可能用带数据的参数列表展开 H2 章节细节。
         1. **结构与强互动 HTML**: 
            - **首段直出答案**: 直接用两句话干净利落地回答标题最核心痛点（Featured Snippet黄金位）。
            {toc_instruction}
