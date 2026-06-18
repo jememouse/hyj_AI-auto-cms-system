@@ -84,16 +84,50 @@ class TrendSearchSkill(BaseSkill):
                         os.remove(tracker_file)
             # -------------------------------------------------------------
 
-            pull_limit_d1 = 75
-            # 从 D1 拉取本周新增的关键词 (按先进后出/LIFO原则，取最新抓取的词)
-            unused_records = db.execute("SELECT keyword FROM keywords_repo WHERE status = '本周新增' ORDER BY id DESC LIMIT ?", [pull_limit_d1])
+            # --- 动态 5:5 比例分配逻辑 ---
+            total_pull_limit = 150
+            half_limit = total_pull_limit // 2
+
+            # 1. 先尝试从 D1 拉取最多 150 个 (假设极端情况 GS 没有词)
+            d1_fetched_records = db.execute("SELECT keyword FROM keywords_repo WHERE status = '本周新增' ORDER BY id DESC LIMIT ?", [total_pull_limit]) or []
             
+            # 2. 再尝试从 Google Sheets 拉取最多 150 个
+            from shared.google_client import GoogleSheetClient
+            gs_client = GoogleSheetClient()
+            gs_fetched_records = []
+            if gs_client.client:
+                print("📦 正在连接 Google Sheets 读取 `keywords_lib` 蓄水池...")
+                gs_fetched_records = gs_client.fetch_records_by_status("", limit=total_pull_limit, table_id="keywords_lib", reverse_batch=True, fetch_from_bottom=True)
+                if len(gs_fetched_records) < total_pull_limit:
+                    gs_fetched_records.extend(gs_client.fetch_records_by_status("Unused", limit=total_pull_limit - len(gs_fetched_records), table_id="keywords_lib", reverse_batch=True, fetch_from_bottom=True))
+            
+            # 3. 计算最终各自应该分配的数量
+            count_d1 = len(d1_fetched_records)
+            count_gs = len(gs_fetched_records)
+            
+            if count_gs >= half_limit and count_d1 >= half_limit:
+                pick_gs = half_limit
+                pick_d1 = half_limit
+            elif count_gs < half_limit:
+                pick_gs = count_gs
+                pick_d1 = min(count_d1, total_pull_limit - pick_gs)
+            else: # count_d1 < half_limit
+                pick_d1 = count_d1
+                pick_gs = min(count_gs, total_pull_limit - pick_d1)
+                
+            print(f"⚖️ [动态池分配] 目标: {total_pull_limit}。当前库存 D1: {count_d1}, GS: {count_gs}。最终分配 D1: {pick_d1}, GS: {pick_gs}。")
+
+            # 4. 截取最终需要的数据
+            d1_to_process = d1_fetched_records[:pick_d1]
+            gs_to_process = gs_fetched_records[:pick_gs]
+
             externals = []
             new_pending_records = []
             
-            if unused_records:
+            # ===== 处理 D1 数据 =====
+            if d1_to_process:
                 keywords_to_update = []
-                for r in unused_records:
+                for r in d1_to_process:
                     kw = str(r.get("keyword", "")).strip()
                     if kw:
                         externals.append(f"[外部指定] {kw}")
@@ -112,54 +146,44 @@ class TrendSearchSkill(BaseSkill):
                 # 批量更新为 Used 并记录使用时间
                 if keywords_to_update:
                     placeholders = ",".join(["?"] * len(keywords_to_update))
-                    # 注意：需要在 D1 的 keywords_repo 表中增加 used_at 字段
                     db.execute(f"UPDATE keywords_repo SET status = 'Used', used_at = ? WHERE keyword IN ({placeholders})", [now_str] + keywords_to_update)
 
                 if externals:
                     all_trends.extend(externals)
                     print(f"✅ 成功从 D1 蓄水池滴灌了 {len(externals)} 个高优词条到本批次")
             else:
-                print("ℹ️ D1 蓄水池 (keywords_repo) 中目前没有待处理的 本周新增 词条。")
+                print("ℹ️ D1 蓄水池中没有贡献任何 本周新增 词条。")
                 
-            # ===== 0.1 提取云端(Google Sheets: keywords_lib)的优先级词条 =====
-            from shared.google_client import GoogleSheetClient
-            gs_client = GoogleSheetClient()
-            if gs_client.client:
-                print("📦 正在连接 Google Sheets 读取 `keywords_lib` 蓄水池...")
-                pull_limit_gs = 75
-                gs_records = gs_client.fetch_records_by_status("", limit=pull_limit_gs, table_id="keywords_lib", reverse_batch=True, fetch_from_bottom=True)
-                if len(gs_records) < pull_limit_gs:
-                    gs_records.extend(gs_client.fetch_records_by_status("Unused", limit=pull_limit_gs - len(gs_records), table_id="keywords_lib", reverse_batch=True, fetch_from_bottom=True))
-                
+            # ===== 处理 GS 数据 =====
+            if gs_to_process:
                 gs_externals = []
-                if gs_records:
-                    for r in gs_records:
-                        kw = str(r.get("Keyword", "")).strip()
-                        if kw:
-                            gs_externals.append(f"[外部指定] {kw}")
-                            if kw not in mining_seeds:
-                                mining_seeds.append(kw)
+                for r in gs_to_process:
+                    kw = str(r.get("Keyword", "")).strip()
+                    if kw:
+                        gs_externals.append(f"[外部指定] {kw}")
+                        if kw not in mining_seeds:
+                            mining_seeds.append(kw)
+                        
+                        rec_id = r.get("record_id")
+                        if rec_id:
+                            import time
+                            now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                            gs_client.update_record(rec_id, {
+                                "Status": "Used",
+                                "词条使用时间": now_str
+                            }, table_id="keywords_lib")
                             
-                            rec_id = r.get("record_id")
-                            if rec_id:
-                                import time
-                                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
-                                gs_client.update_record(rec_id, {
-                                    "Status": "Used",
-                                    "词条使用时间": now_str
-                                }, table_id="keywords_lib")
-                                
-                                new_pending_records.append({
-                                    "record_id": rec_id,
-                                    "keyword": kw,
-                                    "pulled_at": now_str,
-                                    "source": "GS"
-                                })
-                    if gs_externals:
-                        all_trends.extend(gs_externals)
-                        print(f"✅ 成功从 Google Sheets 蓄水池滴灌了 {len(gs_externals)} 个高优词条到本批次")
-                else:
-                    print("ℹ️ Google Sheets 蓄水池 (keywords_lib) 中目前没有待处理的 Unused 词条。")
+                            new_pending_records.append({
+                                "record_id": rec_id,
+                                "keyword": kw,
+                                "pulled_at": now_str,
+                                "source": "GS"
+                            })
+                if gs_externals:
+                    all_trends.extend(gs_externals)
+                    print(f"✅ 成功从 Google Sheets 蓄水池滴灌了 {len(gs_externals)} 个高优词条到本批次")
+            else:
+                print("ℹ️ Google Sheets 蓄水池中没有贡献任何 Unused 词条。")
 
             # 统一写入本地快照
             if new_pending_records:
