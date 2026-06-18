@@ -95,10 +95,11 @@ class TrendSearchSkill(BaseSkill):
                             "pulled_at": now_str
                         })
                 
-                # 批量更新为 Used
+                # 批量更新为 Used 并记录使用时间
                 if keywords_to_update:
                     placeholders = ",".join(["?"] * len(keywords_to_update))
-                    db.execute(f"UPDATE keywords_repo SET status = 'Used' WHERE keyword IN ({placeholders})", keywords_to_update)
+                    # 注意：需要在 D1 的 keywords_repo 表中增加 used_at 字段
+                    db.execute(f"UPDATE keywords_repo SET status = 'Used', used_at = ? WHERE keyword IN ({placeholders})", [now_str] + keywords_to_update)
 
                 if new_pending_records:
                     os.makedirs(os.path.dirname(tracker_file), exist_ok=True)
