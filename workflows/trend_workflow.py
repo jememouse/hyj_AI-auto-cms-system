@@ -65,22 +65,23 @@ class TrendWorkflow(BaseWorkflow):
                             if clean_st:
                                 consumed_kws.add(clean_st)
 
-                    from shared.google_client import GoogleSheetClient
-                    client = GoogleSheetClient()
+                    from shared.d1_client import D1Client
+                    db = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2a-48c8-9c60-a20c3260cc70"))
                     
-                    if client.client:
+                    if db:
                         rollback_count = 0
+                        rollback_kws = []
                         for orphan in orphans:
                             kw = orphan.get("keyword", "")
                             # 模糊匹配容错：允许大模型输出带有修饰词
                             if kw and not any((kw in c or c in kw) for c in consumed_kws):
-                                rec_id = orphan.get("record_id")
-                                if rec_id:
-                                    client.update_record(rec_id, {"Status": "Unused"}, table_id="keywords_lib")
-                                    rollback_count += 1
-                                    
-                        if rollback_count > 0:
-                            print(f"🔄 [Reconcile] 本地对账完毕，发现 {rollback_count} 个脱落种子词，已安全回拨为 Unused。")
+                                rollback_kws.append(kw)
+                                rollback_count += 1
+                        
+                        if rollback_kws:
+                            placeholders = ",".join(["?"] * len(rollback_kws))
+                            db.execute(f"UPDATE keywords_repo SET status = '本周新增' WHERE keyword IN ({placeholders})", rollback_kws)
+                            print(f"🔄 [Reconcile] 本地对账完毕，发现 {rollback_count} 个脱落种子词，已安全回拨为 本周新增。")
                         else:
                             print("✅ [Reconcile] 本地对账完毕，所有种子词均成功消费，无脱落。")
             except Exception as e:
@@ -107,13 +108,13 @@ class TrendWorkflow(BaseWorkflow):
                 orphans = pending_data.get("pending_records", [])
                 if orphans:
                     print(f"⚠️ [Reconcile] 发现进程彻底失败，正在全量回滚 {len(orphans)} 个锁定的种子词...")
-                    from shared.google_client import GoogleSheetClient
-                    client = GoogleSheetClient()
-                    if client.client:
-                        for orphan in orphans:
-                            rec_id = orphan.get("record_id")
-                            if rec_id:
-                                client.update_record(rec_id, {"Status": "Unused"}, table_id="keywords_lib")
+                    from shared.d1_client import D1Client
+                    db = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2a-48c8-9c60-a20c3260cc70"))
+                    if db:
+                        rollback_kws = [orphan.get("keyword") for orphan in orphans if orphan.get("keyword")]
+                        if rollback_kws:
+                            placeholders = ",".join(["?"] * len(rollback_kws))
+                            db.execute(f"UPDATE keywords_repo SET status = '本周新增' WHERE keyword IN ({placeholders})", rollback_kws)
                         print("✅ [Reconcile] 全量回滚完毕，种子词已安全释放。")
             except Exception as e:
                 print(f"❌ [Reconcile] 回滚异常: {e}")

@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class D1Client:
-    def __init__(self):
+    def __init__(self, db_id=None):
         self.account_id = os.getenv("CF_ACCOUNT_ID", "").strip()
-        self.db_id = os.getenv("CF_D1_DATABASE_ID", "").strip()
+        self.db_id = db_id or os.getenv("CF_D1_DATABASE_ID", "").strip()
         self.token = os.getenv("CF_API_TOKEN", "").strip()
         
         if not all([self.account_id, self.db_id, self.token]):

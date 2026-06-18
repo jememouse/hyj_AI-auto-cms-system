@@ -42,83 +42,75 @@ class TrendSearchSkill(BaseSkill):
 
         print("📡 [TrendSearch] 开始多源数据抓取...")
         
-        # ===== 0. 提取云端(Google Sheets: keywords_lib)的优先级词条 (如 5118 导出) =====
+        # ===== 0. 提取云端(Cloudflare D1: keywords_repo)的优先级词条 =====
         try:
-            from shared.google_client import GoogleSheetClient
-            client = GoogleSheetClient()
-            if client.client: # 确认连接成功
-                print("📦 正在连接 Google Sheets 读取 `keywords_lib` 蓄水池...")
-                
-                # --- [新增] 自愈逻辑: 检测并回滚上一次意外崩溃留下的孤儿记录 ---
-                tracker_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "pending_seeds.json")
-                if os.path.exists(tracker_file):
-                    try:
-                        with open(tracker_file, 'r', encoding='utf-8') as f:
-                            pending_data = json.load(f)
-                        
-                        orphans = pending_data.get("pending_records", [])
-                        if orphans:
-                            print(f"⚠️ [Self-Healing] 发现 {len(orphans)} 个上次异常中断遗留的记录，启动回滚...")
-                            for orphan in orphans:
-                                rec_id = orphan.get("record_id")
-                                if rec_id:
-                                    client.update_record(rec_id, {"Status": "Unused"}, table_id="keywords_lib")
-                            print("✅ [Self-Healing] 回滚完成，释放被锁定的种子词。")
-                    except Exception as e:
-                        print(f"❌ [Self-Healing] 修复状态异常: {e}")
-                    finally:
-                        if os.path.exists(tracker_file):
-                            os.remove(tracker_file)
-                # -------------------------------------------------------------
-
-                pull_limit = 150
-                
-                # 兼容两种状态：留空 ("") 或者填了 "Unused"，并开启 fetch_from_bottom=True 实现真正的“先进后出”(LIFO) 优先抽取最新添加的词库
-                unused_records = client.fetch_records_by_status("", limit=pull_limit, table_id="keywords_lib", reverse_batch=True, fetch_from_bottom=True)
-                if len(unused_records) < pull_limit:
-                    unused_records.extend(client.fetch_records_by_status("Unused", limit=pull_limit - len(unused_records), table_id="keywords_lib", reverse_batch=True, fetch_from_bottom=True))
+            from shared.d1_client import D1Client
+            # 初始化专门指向 packaging_db 的 D1 客户端
+            db = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2a-48c8-9c60-a20c3260cc70"))
+            print("📦 正在连接 D1 Database 读取 `keywords_repo` 蓄水池...")
+            
+            # --- [新增] 自愈逻辑: 检测并回滚上一次意外崩溃留下的孤儿记录 ---
+            tracker_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "pending_seeds.json")
+            if os.path.exists(tracker_file):
+                try:
+                    with open(tracker_file, 'r', encoding='utf-8') as f:
+                        pending_data = json.load(f)
                     
-                externals = []
-                new_pending_records = []
-                
-                if unused_records:
-                    for r in unused_records:
-                        kw = str(r.get("Keyword", "")).strip()
-                        if kw:
-                            externals.append(f"[外部指定] {kw}")
-                            # 同时将这个外部热词追加到长尾挖掘的种子库中，让小红书等平台基于它去裂变
-                            if kw not in mining_seeds:
-                                mining_seeds.append(kw)
-                                
-                            # 立即标记该单元格为 Used 并填入使用时间，完成滴灌闭环
-                            rec_id = r.get("record_id")
-                            if rec_id:
-                                import time
-                                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
-                                client.update_record(rec_id, {
-                                    "Status": "Used",
-                                    "词条使用时间": now_str
-                                }, table_id="keywords_lib")
-                                
-                                # 将该词条及其 ID 记录到本地快照，用于出错后的二阶段提交回滚
-                                new_pending_records.append({
-                                    "record_id": rec_id,
-                                    "keyword": kw,
-                                    "pulled_at": now_str
-                                })
-                                
-                    if new_pending_records:
-                        # 确保 data 目录存在
-                        os.makedirs(os.path.dirname(tracker_file), exist_ok=True)
-                        with open(tracker_file, 'w', encoding='utf-8') as f:
-                            json.dump({"pending_records": new_pending_records}, f, ensure_ascii=False, indent=2)
-                        print(f"✅ [CheckPoint] 已将 {len(new_pending_records)} 个锁定词条记入本地快照备份。")
+                    orphans = pending_data.get("pending_records", [])
+                    if orphans:
+                        print(f"⚠️ [Self-Healing] 发现 {len(orphans)} 个上次异常中断遗留的记录，启动回滚...")
+                        rollback_kws = [orphan.get("keyword") for orphan in orphans if orphan.get("keyword")]
+                        if rollback_kws:
+                            placeholders = ",".join(["?"] * len(rollback_kws))
+                            db.execute(f"UPDATE keywords_repo SET status = '本周新增' WHERE keyword IN ({placeholders})", rollback_kws)
+                        print("✅ [Self-Healing] 回滚完成，释放被锁定的种子词。")
+                except Exception as e:
+                    print(f"❌ [Self-Healing] 修复状态异常: {e}")
+                finally:
+                    if os.path.exists(tracker_file):
+                        os.remove(tracker_file)
+            # -------------------------------------------------------------
 
-                    if externals:
-                        all_trends.extend(externals)
-                        print(f"✅ 成功从云端蓄水池滴灌了 {len(externals)} 个高优词条到本批次")
-                else:
-                    print("ℹ️ 蓄水池 (keywords_lib) 中目前没有待处理的 Unused 词条。")
+            pull_limit = 150
+            # 从 D1 拉取本周新增的关键词 (假设表中有 id, keyword, status)
+            unused_records = db.execute("SELECT keyword FROM keywords_repo WHERE status = '本周新增' LIMIT ?", [pull_limit])
+            
+            externals = []
+            new_pending_records = []
+            
+            if unused_records:
+                keywords_to_update = []
+                for r in unused_records:
+                    kw = str(r.get("keyword", "")).strip()
+                    if kw:
+                        externals.append(f"[外部指定] {kw}")
+                        if kw not in mining_seeds:
+                            mining_seeds.append(kw)
+                        
+                        keywords_to_update.append(kw)
+                        import time
+                        now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                        new_pending_records.append({
+                            "keyword": kw,
+                            "pulled_at": now_str
+                        })
+                
+                # 批量更新为 Used
+                if keywords_to_update:
+                    placeholders = ",".join(["?"] * len(keywords_to_update))
+                    db.execute(f"UPDATE keywords_repo SET status = 'Used' WHERE keyword IN ({placeholders})", keywords_to_update)
+
+                if new_pending_records:
+                    os.makedirs(os.path.dirname(tracker_file), exist_ok=True)
+                    with open(tracker_file, 'w', encoding='utf-8') as f:
+                        json.dump({"pending_records": new_pending_records}, f, ensure_ascii=False, indent=2)
+                    print(f"✅ [CheckPoint] 已将 {len(new_pending_records)} 个锁定词条记入本地快照备份。")
+
+                if externals:
+                    all_trends.extend(externals)
+                    print(f"✅ 成功从云端蓄水池滴灌了 {len(externals)} 个高优词条到本批次")
+            else:
+                print("ℹ️ 蓄水池 (keywords_repo) 中目前没有待处理的 本周新增 词条。")
         except Exception as e:
             import traceback
             print(f"❌ 读取云端词库表异常: {e}")
