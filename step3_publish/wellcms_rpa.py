@@ -190,26 +190,18 @@ class WellCMSPublisher:
             except Exception as e:
                 logger.warning(f"⚠️ 图片下载异常/超时: {e}")
                 
-        # 如果原始图失败，启动降级开源图库
+        # 如果原始图失败，按用户要求：不再硬塞备用图，直接取消所有图像引用
         if not image_content:
-            logger.info("🔄 原图不可用，正在从开源图库(Pexels/Pixabay)拉取关联图片...")
-            keywords = article.get('keywords', 'packaging box')
-            fallback_content, fallback_url = self._get_fallback_image(keywords)
-            
-            if fallback_content and fallback_url:
-                image_content = fallback_content
-                valid_img_url = fallback_url
-                logger.info(f"✅ 成功获取开源图库图片: {fallback_url[:60]}...")
-                
-                # 替换原文中的死链，保证前端显示正常
-                if original_img_url:
-                    html_content = html_content.replace(original_img_url, valid_img_url)
-                else:
-                    # 连 img 标签都没有，强制在首段插入
-                    alt_text = article.get('title', 'packaging')
-                    html_content = f'<p style="text-align: center;"><img src="{valid_img_url}" alt="{alt_text}" style="max-width: 100%; border-radius: 8px;"/></p>\n' + html_content
-            else:
-                logger.warning("❌ 所有开源图库均无响应，文章将无图发布。")
+            logger.info("🗑️ AI 图像下载失败或无额度，直接取消所有图像引用，文章将纯文本发布。")
+            if original_img_url:
+                # 尝试移除包裹的 <p> 标签和 <img> 标签
+                # 1. 匹配包裹在 p 标签里的 img
+                pattern_p = r'<p[^>]*>\s*<img[^>]+src="' + re.escape(original_img_url) + r'"[^>]*>\s*</p>'
+                html_content = re.sub(pattern_p, '', html_content)
+                # 2. 匹配散落的 img 标签
+                pattern_img = r'<img[^>]+src="' + re.escape(original_img_url) + r'"[^>]*>'
+                html_content = re.sub(pattern_img, '', html_content)
+                logger.info("✅ 已清洗失效的图片 HTML 标签")
                     
         # 3. 构建多部分表单 (Multipart Form-Data)
         data_payload = {
