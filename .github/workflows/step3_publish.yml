@@ -36,10 +36,10 @@ jobs:
 
     - name: Run Step3 - RPA 发布 (${{ matrix.category }})
       env:
-        # 并行模式: 每个 Job 独占一个分类，每次发布 25 篇，确保能在 30 分钟内跑完
+        # 并行模式: 每个 Job 独占一个分类，每次发布 500 篇，极速清空队列
         PUBLISH_CATEGORY: ${{ matrix.category }}
-        MAX_PUBLISH_TOTAL: "25"
-        MAX_PUBLISH_PER_CATEGORY: "25"
+        MAX_PUBLISH_TOTAL: "500"
+        MAX_PUBLISH_PER_CATEGORY: "500"
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         # MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
         GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}
