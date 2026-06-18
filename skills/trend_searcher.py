@@ -85,8 +85,8 @@ class TrendSearchSkill(BaseSkill):
             # -------------------------------------------------------------
 
             pull_limit_d1 = 75
-            # 从 D1 拉取本周新增的关键词
-            unused_records = db.execute("SELECT keyword FROM keywords_repo WHERE status = '本周新增' LIMIT ?", [pull_limit_d1])
+            # 从 D1 拉取本周新增的关键词 (按先进后出/LIFO原则，取最新抓取的词)
+            unused_records = db.execute("SELECT keyword FROM keywords_repo WHERE status = '本周新增' ORDER BY id DESC LIMIT ?", [pull_limit_d1])
             
             externals = []
             new_pending_records = []
