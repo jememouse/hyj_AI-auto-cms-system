@@ -59,10 +59,23 @@ class TrendSearchSkill(BaseSkill):
                     orphans = pending_data.get("pending_records", [])
                     if orphans:
                         print(f"⚠️ [Self-Healing] 发现 {len(orphans)} 个上次异常中断遗留的记录，启动回滚...")
-                        rollback_kws = [orphan.get("keyword") for orphan in orphans if orphan.get("keyword")]
-                        if rollback_kws:
-                            placeholders = ",".join(["?"] * len(rollback_kws))
-                            db.execute(f"UPDATE keywords_repo SET status = '本周新增' WHERE keyword IN ({placeholders})", rollback_kws)
+                        # D1 回滚
+                        rollback_kws_d1 = [orphan.get("keyword") for orphan in orphans if orphan.get("keyword") and orphan.get("source") == "D1"]
+                        if rollback_kws_d1:
+                            placeholders = ",".join(["?"] * len(rollback_kws_d1))
+                            db.execute(f"UPDATE keywords_repo SET status = '本周新增' WHERE keyword IN ({placeholders})", rollback_kws_d1)
+                            
+                        # GS 回滚
+                        rollback_gs = [o for o in orphans if o.get("source") == "GS"]
+                        if rollback_gs:
+                            from shared.google_client import GoogleSheetClient
+                            gs_client = GoogleSheetClient()
+                            if gs_client.client:
+                                for o in rollback_gs:
+                                    rec_id = o.get("record_id")
+                                    if rec_id:
+                                        gs_client.update_record(rec_id, {"Status": "Unused"}, table_id="keywords_lib")
+
                         print("✅ [Self-Healing] 回滚完成，释放被锁定的种子词。")
                 except Exception as e:
                     print(f"❌ [Self-Healing] 修复状态异常: {e}")
@@ -71,9 +84,9 @@ class TrendSearchSkill(BaseSkill):
                         os.remove(tracker_file)
             # -------------------------------------------------------------
 
-            pull_limit = 150
-            # 从 D1 拉取本周新增的关键词 (假设表中有 id, keyword, status)
-            unused_records = db.execute("SELECT keyword FROM keywords_repo WHERE status = '本周新增' LIMIT ?", [pull_limit])
+            pull_limit_d1 = 75
+            # 从 D1 拉取本周新增的关键词
+            unused_records = db.execute("SELECT keyword FROM keywords_repo WHERE status = '本周新增' LIMIT ?", [pull_limit_d1])
             
             externals = []
             new_pending_records = []
@@ -92,7 +105,8 @@ class TrendSearchSkill(BaseSkill):
                         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
                         new_pending_records.append({
                             "keyword": kw,
-                            "pulled_at": now_str
+                            "pulled_at": now_str,
+                            "source": "D1"
                         })
                 
                 # 批量更新为 Used 并记录使用时间
@@ -101,17 +115,58 @@ class TrendSearchSkill(BaseSkill):
                     # 注意：需要在 D1 的 keywords_repo 表中增加 used_at 字段
                     db.execute(f"UPDATE keywords_repo SET status = 'Used', used_at = ? WHERE keyword IN ({placeholders})", [now_str] + keywords_to_update)
 
-                if new_pending_records:
-                    os.makedirs(os.path.dirname(tracker_file), exist_ok=True)
-                    with open(tracker_file, 'w', encoding='utf-8') as f:
-                        json.dump({"pending_records": new_pending_records}, f, ensure_ascii=False, indent=2)
-                    print(f"✅ [CheckPoint] 已将 {len(new_pending_records)} 个锁定词条记入本地快照备份。")
-
                 if externals:
                     all_trends.extend(externals)
-                    print(f"✅ 成功从云端蓄水池滴灌了 {len(externals)} 个高优词条到本批次")
+                    print(f"✅ 成功从 D1 蓄水池滴灌了 {len(externals)} 个高优词条到本批次")
             else:
-                print("ℹ️ 蓄水池 (keywords_repo) 中目前没有待处理的 本周新增 词条。")
+                print("ℹ️ D1 蓄水池 (keywords_repo) 中目前没有待处理的 本周新增 词条。")
+                
+            # ===== 0.1 提取云端(Google Sheets: keywords_lib)的优先级词条 =====
+            from shared.google_client import GoogleSheetClient
+            gs_client = GoogleSheetClient()
+            if gs_client.client:
+                print("📦 正在连接 Google Sheets 读取 `keywords_lib` 蓄水池...")
+                pull_limit_gs = 75
+                gs_records = gs_client.fetch_records_by_status("", limit=pull_limit_gs, table_id="keywords_lib", reverse_batch=True, fetch_from_bottom=True)
+                if len(gs_records) < pull_limit_gs:
+                    gs_records.extend(gs_client.fetch_records_by_status("Unused", limit=pull_limit_gs - len(gs_records), table_id="keywords_lib", reverse_batch=True, fetch_from_bottom=True))
+                
+                gs_externals = []
+                if gs_records:
+                    for r in gs_records:
+                        kw = str(r.get("Keyword", "")).strip()
+                        if kw:
+                            gs_externals.append(f"[外部指定] {kw}")
+                            if kw not in mining_seeds:
+                                mining_seeds.append(kw)
+                            
+                            rec_id = r.get("record_id")
+                            if rec_id:
+                                import time
+                                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                                gs_client.update_record(rec_id, {
+                                    "Status": "Used",
+                                    "词条使用时间": now_str
+                                }, table_id="keywords_lib")
+                                
+                                new_pending_records.append({
+                                    "record_id": rec_id,
+                                    "keyword": kw,
+                                    "pulled_at": now_str,
+                                    "source": "GS"
+                                })
+                    if gs_externals:
+                        all_trends.extend(gs_externals)
+                        print(f"✅ 成功从 Google Sheets 蓄水池滴灌了 {len(gs_externals)} 个高优词条到本批次")
+                else:
+                    print("ℹ️ Google Sheets 蓄水池 (keywords_lib) 中目前没有待处理的 Unused 词条。")
+
+            # 统一写入本地快照
+            if new_pending_records:
+                os.makedirs(os.path.dirname(tracker_file), exist_ok=True)
+                with open(tracker_file, 'w', encoding='utf-8') as f:
+                    json.dump({"pending_records": new_pending_records}, f, ensure_ascii=False, indent=2)
+                print(f"✅ [CheckPoint] 已将 {len(new_pending_records)} 个锁定词条 (D1+GS) 记入本地快照备份。")
         except Exception as e:
             import traceback
             print(f"❌ 读取云端词库表异常: {e}")
