@@ -76,12 +76,13 @@ def backup():
 
     # 3. 通过 Base64 编码数据以确保 JSON 传输安全
     print("\n>>> Step 3: 通过 Google Apps Script 投递文件到云盘...")
-    filename = f"cms_backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_共{len(records)}条.csv"
+    filename = f"cms_backup_{datetime.now().strftime('%Y-%m')}.csv"
     encoded_csv = base64.b64encode(csv_data.encode('utf-8')).decode('utf-8')
     
     payload = {
         "filename": filename,
-        "csvData": encoded_csv
+        "csvData": encoded_csv,
+        "isAppend": True
     }
     
     try:
@@ -161,12 +162,13 @@ def backup():
         csv_data_pkg = csv_buffer_pkg.getvalue()
         csv_buffer_pkg.close()
         
-        filename_pkg = f"keywords_backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_共{len(kws_records)}条.csv"
+        filename_pkg = f"keywords_backup_{datetime.now().strftime('%Y-%m')}.csv"
         encoded_csv_pkg = base64.b64encode(csv_data_pkg.encode('utf-8')).decode('utf-8')
         
         payload_pkg = {
             "filename": filename_pkg,
-            "csvData": encoded_csv_pkg
+            "csvData": encoded_csv_pkg,
+            "isAppend": True
         }
         
         try:
