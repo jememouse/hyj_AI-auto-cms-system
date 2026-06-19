@@ -47,7 +47,7 @@ class GoogleSheetClient:
             creds = None
             
             # 1. 尝试从环境变量读取
-            json_str = os.getenv("GOOGLE_CREDENTIALS_JSON")
+            json_str = os.getenv("GOOGLE_CREDENTIALS_JSON", "").strip()
             if json_str:
                 # print(f"🔍 检测到环境变量 GOOGLE_CREDENTIALS_JSON (长度: {len(json_str)})") # Debug
                 try:

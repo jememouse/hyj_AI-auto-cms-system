@@ -7,9 +7,9 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shared.d1_client import D1Client
 
-account_id = os.getenv("CF_ACCOUNT_ID")
-database_id = os.getenv("CF_D1_DATABASE_ID")
-api_token = os.getenv("CF_API_TOKEN")
+account_id = os.getenv("CF_ACCOUNT_ID", "").strip()
+database_id = os.getenv("CF_D1_DATABASE_ID", "").strip()
+api_token = os.getenv("CF_API_TOKEN", "").strip()
 
 print("="*40)
 print("📦 D1 空间与容量明细报告")

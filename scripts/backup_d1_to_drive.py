@@ -17,7 +17,7 @@ def backup():
     print("🚀 D1 -> Google Drive (GAS 极客通道) 冷数据备份程序")
     print("=" * 50 + "\n")
 
-    gas_url = os.getenv("GOOGLE_APPS_SCRIPT_URL", "")
+    gas_url = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").strip()
     if not gas_url:
         print("❌ 错误：请在 .env 或 Github Secrets 中配置 GOOGLE_APPS_SCRIPT_URL")
         return

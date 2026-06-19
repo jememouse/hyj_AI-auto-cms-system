@@ -131,11 +131,11 @@ FEISHU_XHS_TABLE_ID = "xhs"
 MAX_DAILY_XHS = 12 # Default fallback
 
 # WellCMS 配置
-WELLCMS_USERNAME = os.getenv("WELLCMS_USERNAME", "")
-WELLCMS_PASSWORD = os.getenv("WELLCMS_PASSWORD", "")
-WELLCMS_LOGIN_URL = os.getenv("WELLCMS_LOGIN_URL", "")
-WELLCMS_ADMIN_URL = os.getenv("WELLCMS_ADMIN_URL", "")
-WELLCMS_POST_URL = os.getenv("WELLCMS_POST_URL", "")
+WELLCMS_USERNAME = os.getenv("WELLCMS_USERNAME", "").strip()
+WELLCMS_PASSWORD = os.getenv("WELLCMS_PASSWORD", "").strip()
+WELLCMS_LOGIN_URL = os.getenv("WELLCMS_LOGIN_URL", "").strip()
+WELLCMS_ADMIN_URL = os.getenv("WELLCMS_ADMIN_URL", "").strip()
+WELLCMS_POST_URL = os.getenv("WELLCMS_POST_URL", "").strip()
 
 # 配置文件
 CONFIG_FILE = os.path.join(PROJECT_ROOT, "box_artist_config.json")
@@ -178,5 +178,5 @@ POLLINATIONS_USE_ANONYMOUS_FIRST = True  # 优先使用匿名模式（省额度�
 POLLINATIONS_ANONYMOUS_INTERVAL = 6      # 匿名模式请求间隔（秒）
 
 # 图库 API Configuration (Fallback 服务)
-PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
-PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY", "")
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
+PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY", "").strip()
