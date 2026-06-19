@@ -26,7 +26,7 @@ def backup():
     d1_cms = D1Client(db_id=os.getenv("CF_D1_DATABASE_ID", ""))
     
     # 初始化 词库 数据库 (keywords_repo)
-    d1_pkg = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2a-48c8-9c60-a20c3260cc70"))
+    d1_pkg = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2e-48c8-9c6e-63e76873b855"))
     
     # ==========================================
     # 任务 1: 归档 CMS 文章数据库

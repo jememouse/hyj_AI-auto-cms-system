@@ -246,7 +246,7 @@ def main():
         
     print(f"✅ 抓取完成，共提取 {len(fetched_data)} 个有效词条。准备入库去重...")
     
-    db = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2a-48c8-9c60-a20c3260cc70"))
+    db = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2e-48c8-9c6e-63e76873b855"))
     if not db.account_id or not db.token:
         print("❌ [Fatal Error] 缺少 D1 数据库环境变量 (CF_ACCOUNT_ID, CF_API_TOKEN)。")
         return

@@ -46,7 +46,7 @@ class TrendSearchSkill(BaseSkill):
         try:
             from shared.d1_client import D1Client
             # 初始化专门指向 packaging_db 的 D1 客户端
-            db = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2a-48c8-9c60-a20c3260cc70"))
+            db = D1Client(db_id=os.getenv("CF_D1_PACKAGING_DB_ID", "2ef1ee52-ad2e-48c8-9c6e-63e76873b855"))
             print("📦 正在连接 D1 Database 读取 `keywords_repo` 蓄水池...")
             
             # --- [新增] 自愈逻辑: 检测并回滚上一次意外崩溃留下的孤儿记录 ---
