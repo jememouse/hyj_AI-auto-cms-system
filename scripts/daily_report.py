@@ -50,7 +50,7 @@ def generate_daily_report():
         yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
         
         # 3. 获取今日生成/起草数量
-        res_gen_today = db.execute("SELECT COUNT(*) as c FROM seo_articles WHERE substr(created_at, 1, 10) = ?", [today_str])
+        res_gen_today = db.execute("SELECT COUNT(*) as c FROM seo_articles WHERE substr(datetime(created_at, '+8 hours'), 1, 10) = ?", [today_str])
         gen_today_count = res_gen_today[0].get('c', 0) if res_gen_today else 0
         
         # 4. 获取积压状态：待发布(Pending)与待写(Ready)

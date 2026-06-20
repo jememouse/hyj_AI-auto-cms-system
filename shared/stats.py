@@ -94,19 +94,35 @@ def get_summary() -> str:
         )
         if res_total:
             total['published'] = res_total[0].get('cnt', total['published'])
+        res_total_gen = bus.client.execute(
+            "SELECT count(*) as cnt FROM seo_articles WHERE status IN ('Pending', 'Top priority', 'Published')"
+        )
+        if res_total_gen:
+            total['generated'] = res_total_gen[0].get('cnt', total['generated'])
+            
+        res_today_gen = bus.client.execute(
+            "SELECT count(*) as cnt FROM seo_articles WHERE substr(datetime(created_at, '+8 hours'), 1, 10) = ?", 
+            [today]
+        )
+        if res_today_gen:
+            daily['generated'] = res_today_gen[0].get('cnt', daily['generated'])
+            
     except Exception as e:
         print(f"⚠️ [Stats] 无法从 D1 获取实时发布数据: {e}")
+        
+    generated_base = max(total['generated'], 1)
+    success_rate = min(total['published'] / generated_base * 100, 100.0)
     
     return f"""📊 **数据统计**
 **今日 ({today})**
-- 生成: {daily['generated']} 篇
-- 发布: {daily['published']} 篇
-- 失败: {daily['failed']} 篇
+- 新增话题: {daily['generated']} 篇
+- 成功发布: {daily['published']} 篇
+- 任务失败: {daily['failed']} 篇
 
 **累计**
-- 生成: {total['generated']} 篇
-- 发布: {total['published']} 篇
-- 成功率: {(total['published'] / max(total['generated'], 1) * 100):.1f}%"""
+- 累计生成: {total['generated']} 篇
+- 累计发布: {total['published']} 篇
+- 发布进度: {success_rate:.1f}%"""
 
 
 def print_summary():
