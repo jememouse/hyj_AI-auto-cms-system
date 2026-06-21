@@ -53,7 +53,7 @@ jobs:
         CF_D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
         CF_D1_PACKAGING_DB_ID: ${{ secrets.CF_D1_PACKAGING_DB_ID }}
         CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+        POLLINATIONS_API_KEYS: ${{ secrets.POLLINATIONS_API_KEYS }}
         TZ: 'Asia/Shanghai'
       run: |
         uv run python -m step2_article.agent_runner
