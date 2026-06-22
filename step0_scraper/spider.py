@@ -147,14 +147,42 @@ def fetch_taobao(kw: str):
         pass
     return []
 
+def fetch_zhihu(kw: str):
+    try:
+        api_key = os.environ.get("ZHIHU_API_KEY")
+        if not api_key:
+            return []
+            
+        url = "https://developer.zhihu.com/api/v1/content/zhihu_search"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "X-Request-Timestamp": str(int(time.time())),
+            "Content-Type": "application/json"
+        }
+        res = requests.get(url, headers=headers, params={"Query": kw}, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            search_list = data.get("data", {}).get("SearchList", [])
+            # 提取标题并去掉后缀 " - 知乎"
+            titles = []
+            for item in search_list:
+                title = item.get("Title", "")
+                if title:
+                    titles.append(title.replace(" - 知乎", "").strip())
+            return titles
+    except Exception:
+        pass
+    return []
+
 def get_aggregated_suggestions(keyword: str):
     words_set = set()
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
             executor.submit(fetch_baidu, keyword): 'baidu',
             executor.submit(fetch_bing, keyword): 'bing',
             executor.submit(fetch_360, keyword): '360',
-            executor.submit(fetch_taobao, keyword): 'taobao'
+            executor.submit(fetch_taobao, keyword): 'taobao',
+            executor.submit(fetch_zhihu, keyword): 'zhihu'
         }
         for future in as_completed(futures):
             try:
