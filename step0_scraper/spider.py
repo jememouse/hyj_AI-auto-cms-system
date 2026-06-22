@@ -7,6 +7,8 @@ import datetime
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # 添加项目根目录到 sys.path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -46,6 +48,9 @@ SEEDS = [
 
 def filter_noise(word: str) -> bool:
     w = word.lower()
+    # 1. 针对知乎情感故事、主观情绪类噪音的清洗
+    if any(x in w for x in ["抑郁", "辞职", "吐槽", "相亲", "渣男", "被骗", "黑厂", "坑人", "后悔", "劝退", "恶心", "男朋友", "女朋友", "老公", "老婆", "避坑", "我做", "我是", "我真的", "破防"]):
+        return False
     if "小米" in w and any(x in w for x in ["吃", "煮", "大米", "粮食", "农产品", "饭", "粥", "过期", "保质期", "大米发霉", "煮饭"]):
         return False
     if any(x in w for x in ["招聘", "找工作", "工资", "人才网", "累不累", "包吃住", "包装工", "招工", "月薪", "待遇"]):
@@ -159,18 +164,40 @@ def fetch_zhihu(kw: str):
             "X-Request-Timestamp": str(int(time.time())),
             "Content-Type": "application/json"
         }
-        res = requests.get(url, headers=headers, params={"Query": kw}, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            search_list = data.get("data", {}).get("SearchList", [])
-            # 提取标题并去掉后缀 " - 知乎"
-            titles = []
-            for item in search_list:
-                title = item.get("Title", "")
-                if title:
-                    titles.append(title.replace(" - 知乎", "").strip())
-            return titles
-    except Exception:
+        
+        # 3. 配置连接池与指数退避重试策略 (解决 API 限流与网络波动)
+        session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "OPTIONS"]
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=5, pool_maxsize=5)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        res = session.get(url, headers=headers, params={"Query": kw}, timeout=(3.0, 10.0))
+        res.raise_for_status()  # 自动抛出 HTTP 错误以便被捕获
+        
+        data = res.json()
+        search_list = data.get("data", {}).get("SearchList", [])
+        
+        # 提取标题并进行长度清洗
+        titles = []
+        for item in search_list:
+            title = item.get("Title", "")
+            if title:
+                # 2. 清除平台特征后缀
+                clean_title = title.replace(" - 知乎", "").replace("知乎", "").strip()
+                # 防止由于标题过长撑爆数据库或使后续 Prompt 变长，进行安全截断
+                if len(clean_title) > 50:
+                    clean_title = clean_title[:47] + "..."
+                if clean_title:
+                    titles.append(clean_title)
+        return titles
+    except Exception as e:
+        # 发生超时、429 等错误时静默处理或记录日志，不阻断主流程
         pass
     return []
 
