@@ -2,8 +2,8 @@ name: 每日发布数据统计报告
 
 on:
   schedule:
-    # 每天北京时间 23:50 运行 (UTC时间 15:50)
-    - cron: '50 15 * * *'
+    # 每天北京时间 20:00 运行 (UTC时间 12:00)
+    - cron: '0 12 * * *'
   workflow_dispatch:  # 允许手动触发
 
 jobs:
